@@ -54,6 +54,47 @@ pub fn parse_markdown(content: &str) -> anyhow::Result<ParsedDocument> {
     })
 }
 
+#[derive(serde::Deserialize)]
+struct Notebook {
+    cells: Vec<Cell>,
+}
+
+#[derive(serde::Deserialize)]
+struct Cell {
+    cell_type: String,
+    source: Vec<String>,
+}
+
+/// Parse a Jupyter Notebook file, converting it to Markdown and then to HTML
+#[instrument(skip(content), fields(content_len = content.len()))]
+pub fn parse_notebook(content: &str) -> anyhow::Result<ParsedDocument> {
+    let notebook: Notebook = serde_json::from_str(content)
+        .map_err(|e| anyhow::anyhow!("Invalid Jupyter Notebook JSON: {}", e))?;
+
+    let mut markdown = String::new();
+    for cell in notebook.cells {
+        match cell.cell_type.as_str() {
+            "markdown" => {
+                for line in cell.source {
+                    markdown.push_str(&line);
+                }
+                markdown.push('\n');
+            }
+            "code" => {
+                markdown.push_str("\n```python\n");
+                for line in cell.source {
+                    markdown.push_str(&line);
+                }
+                markdown.push_str("\n```\n");
+            }
+            _ => {}
+        }
+    }
+
+    // Reuse parse_markdown on the generated string
+    parse_markdown(&markdown)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

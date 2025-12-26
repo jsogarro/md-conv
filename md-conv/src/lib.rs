@@ -34,8 +34,12 @@ pub async fn convert_file(input_path: &Path, args: &Args) -> anyhow::Result<Vec<
     let content = std::fs::read_to_string(input_path)
         .with_context(|| format!("Failed to read: {}", input_path.display()))?;
 
-    // 3. Parse Markdown + Front Matter
-    let doc = parser::parse_markdown(&content)?;
+    // 3. Parse content based on file extension
+    let doc = if input_path.extension().map_or(false, |ext| ext == "ipynb") {
+        parser::parse_notebook(&content)?
+    } else {
+        parser::parse_markdown(&content)?
+    };
 
     // 4. Merge configuration
     let config = ConversionConfig::merge(args, doc.front_matter.clone(), input_path)?;
