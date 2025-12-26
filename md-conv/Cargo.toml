@@ -1,0 +1,63 @@
+[package]
+name = "md-conv"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+description = "Convert Markdown to PDF and HTML with front matter and custom CSS"
+license = "MIT"
+repository = "https://github.com/user/md-conv"
+keywords = ["markdown", "pdf", "html", "converter", "cli"]
+categories = ["command-line-utilities", "text-processing"]
+
+[dependencies]
+# CLI
+clap = { version = "4.5", features = ["derive", "env"] }
+
+# Markdown processing
+gray_matter = { version = "0.2", default-features = false, features = ["yaml"] }
+pulldown-cmark = { version = "0.12", default-features = false, features = ["simd"] }
+
+# Templating
+handlebars = "6"
+
+# PDF generation
+chromiumoxide = { version = "0.7", default-features = false, features = ["tokio-runtime"] }
+futures = "0.3"
+
+# Async runtime
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "sync", "time"] }
+async-trait = "0.1"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_yaml = "0.9"
+
+# Error handling
+thiserror = "2"
+anyhow = "1"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+
+# Security
+ammonia = "4"
+home = "=0.5.9" # Pin to avoid edition2024 requirement in 0.5.12
+
+[dev-dependencies]
+tempfile = "3"
+assert_cmd = "2"
+predicates = "3"
+tokio-test = "0.4"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
+
+[profile.dev]
+incremental = true
+
+[profile.dev.package."*"]
+opt-level = 2
