@@ -1,10 +1,9 @@
 use clap::Parser;
-use md_conv::cli;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    let args = cli::Args::parse();
+async fn main() {
+    let args = md_conv::cli::Args::parse();
 
     // Initialize logging with spans for structured diagnostics
     let filter =
@@ -27,12 +26,9 @@ async fn main() -> anyhow::Result<()> {
         std::process::exit(1);
     }
 
-    // Run conversion (calling into lib.rs)
-    if let Err(e) = md_conv::run(args).await {
-        tracing::error!(error = %e, "Conversion failed");
-        eprintln!("\nError: {e:?}");
+    // Run conversion
+    if let Err(_e) = md_conv::run(args).await {
+        // Error already logged via tracing
         std::process::exit(1);
     }
-
-    Ok(())
 }
