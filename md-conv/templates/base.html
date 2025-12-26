@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="{{#if lang}}{{lang}}{{else}}en{{/if}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {{#if title}}<title>{{title}}</title>{{/if}}
+    {{#if author}}<meta name="author" content="{{author}}">{{/if}}
+    {{#if description}}<meta name="description" content="{{description}}">{{/if}}
+    {{#if keywords}}<meta name="keywords" content="{{keywords}}">{{/if}}
+    <meta name="generator" content="md-conv">
+    <style>
+        /* Reset & Base Styles */
+        *, *::before, *::after { box-sizing: border-box; }
+
+        html {
+            font-size: 16px;
+            line-height: 1.6;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                         "Helvetica Neue", Arial, sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        body {
+            margin: 0;
+            padding: 2rem;
+            max-width: 800px;
+            margin-inline: auto;
+            color: #1a1a1a;
+            background: #fff;
+        }
+
+        /* Typography */
+        h1, h2, h3, h4, h5, h6 {
+            margin-top: 1.5em;
+            margin-bottom: 0.5em;
+            line-height: 1.25;
+            font-weight: 600;
+        }
+
+        h1 { font-size: 2.25rem; border-bottom: 1px solid #e5e5e5; padding-bottom: 0.3em; }
+        h2 { font-size: 1.75rem; }
+        h3 { font-size: 1.375rem; }
+        h4 { font-size: 1.125rem; }
+
+        p { margin: 1em 0; }
+
+        a { color: #0066cc; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        /* Code */
+        code {
+            font-family: "SF Mono", "Fira Code", "Cascadia Code", Consolas, monospace;
+            font-size: 0.875em;
+            background: #f5f5f5;
+            padding: 0.2em 0.4em;
+            border-radius: 3px;
+        }
+
+        pre {
+            background: #f5f5f5;
+            padding: 1rem;
+            overflow-x: auto;
+            border-radius: 6px;
+            line-height: 1.4;
+        }
+
+        pre code {
+            background: none;
+            padding: 0;
+            font-size: 0.8125rem;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5em 0;
+        }
+
+        th, td {
+            border: 1px solid #ddd;
+            padding: 0.75rem;
+            text-align: left;
+        }
+
+        th { background: #f9f9f9; font-weight: 600; }
+        tr:nth-child(even) { background: #fafafa; }
+
+        /* Lists */
+        ul, ol { padding-left: 2em; }
+        li { margin: 0.25em 0; }
+
+        /* Task Lists */
+        ul.contains-task-list {
+            list-style: none;
+            padding-left: 0;
+        }
+        li.task-list-item {
+            display: flex;
+            align-items: baseline;
+            gap: 0.5em;
+        }
+        input[type="checkbox"] {
+            margin-right: 0.5em;
+        }
+
+        /* Blockquotes */
+        blockquote {
+            margin: 1em 0;
+            padding: 0.5em 1em;
+            border-left: 4px solid #ddd;
+            color: #666;
+            background: #fafafa;
+        }
+
+        blockquote p:first-child { margin-top: 0; }
+        blockquote p:last-child { margin-bottom: 0; }
+
+        /* Horizontal Rules */
+        hr {
+            border: none;
+            border-top: 1px solid #e5e5e5;
+            margin: 2em 0;
+        }
+
+        /* Images */
+        img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 1em auto;
+        }
+
+        /* Footnotes */
+        .footnote-definition {
+            font-size: 0.875rem;
+            color: #666;
+        }
+
+        /* Document Header */
+        .document-header {
+            margin-bottom: 2em;
+            padding-bottom: 1em;
+            border-bottom: 2px solid #e5e5e5;
+        }
+
+        .document-title {
+            margin-top: 0;
+            margin-bottom: 0.25em;
+        }
+
+        .document-meta {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .document-meta span + span::before {
+            content: " | ";
+        }
+
+        /* Print Styles */
+        @media print {
+            body {
+                padding: 0;
+                max-width: none;
+                color: #000;
+            }
+            a { color: inherit; }
+            pre, code { background: #f5f5f5; }
+
+            /* Avoid page breaks inside these elements */
+            pre, blockquote, table, figure {
+                page-break-inside: avoid;
+            }
+
+            /* Force page break before h1 except first */
+            h1:not(:first-of-type) {
+                page-break-before: always;
+            }
+        }
+    </style>
+    {{#if custom_css}}
+    <style>
+{{{custom_css}}}
+    </style>
+    {{/if}}
+</head>
+<body>
+    {{#if title}}
+    <header class="document-header">
+        <h1 class="document-title">{{title}}</h1>
+        <div class="document-meta">
+            {{#if author}}<span class="author">By {{author}}</span>{{/if}}
+            {{#if date}}<span class="date">{{date}}</span>{{/if}}
+        </div>
+    </header>
+    {{/if}}
+
+    <main class="content">
+{{{content}}}
+    </main>
+</body>
+</html>
