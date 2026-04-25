@@ -7,10 +7,11 @@
 //! - **HTML**: Simple pass-through or template-wrapped output.
 //! - **PDF**: Headless Chrome-based rendering with full CSS/JavaScript support.
 
+mod browser;
 pub mod html;
 pub mod pdf;
 
-pub(crate) use pdf::browser_pool;
+pub(crate) use browser::browser_pool;
 
 use std::path::Path;
 
