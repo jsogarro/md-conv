@@ -130,7 +130,7 @@ fn get_path_from_fd_macos(fd: std::os::unix::io::RawFd) -> Result<PathBuf> {
     use std::os::raw::{c_char, c_int};
 
     const F_GETPATH: c_int = 50; // macOS-specific fcntl command
-    // Use system-defined PATH_MAX for robustness (currently 1024 on macOS)
+                                 // Use system-defined PATH_MAX for robustness (currently 1024 on macOS)
     const PATH_MAX: usize = libc::PATH_MAX as usize;
 
     let mut buf = vec![0u8; PATH_MAX];
@@ -159,8 +159,8 @@ fn get_path_from_fd_macos(fd: std::os::unix::io::RawFd) -> Result<PathBuf> {
 /// Uses `GetFinalPathNameByHandleW` Win32 API.
 #[cfg(target_os = "windows")]
 fn get_path_from_fd_windows(handle: std::os::windows::io::RawHandle) -> Result<PathBuf> {
-    use std::os::windows::ffi::OsStringExt;
     use std::ffi::OsString;
+    use std::os::windows::ffi::OsStringExt;
     use winapi::um::fileapi::GetFinalPathNameByHandleW;
     use winapi::um::winnt::FILE_NAME_NORMALIZED;
 
@@ -181,7 +181,10 @@ fn get_path_from_fd_windows(handle: std::os::windows::io::RawHandle) -> Result<P
         }
 
         if len as usize >= BUFFER_SIZE {
-            bail!("Path too long for Windows buffer (max {} bytes)", BUFFER_SIZE);
+            bail!(
+                "Path too long for Windows buffer (max {} bytes)",
+                BUFFER_SIZE
+            );
         }
 
         let os_string = OsString::from_wide(&buffer[..len as usize]);
@@ -338,10 +341,7 @@ mod tests {
                 Err(e) => {
                     // Error message should be non-empty and informative
                     let msg = e.to_string();
-                    assert!(
-                        !msg.is_empty(),
-                        "Error for long path should have a message"
-                    );
+                    assert!(!msg.is_empty(), "Error for long path should have a message");
                 }
             }
         }

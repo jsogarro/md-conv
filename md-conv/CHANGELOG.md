@@ -26,3 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - JSON output mode for scripting
 - Progress bar for batch operations
 - Configurable PDF options (format, margins, scale, landscape, background)
+- Typed error variants (Parse, Browser, Security, Io, Config, Notebook) with distinct exit codes
+- `Default` implementation for `Args` enabling `..Args::default()` pattern
+- Doc examples and doctests for all public API items
+- Example programs: basic_conversion, html_output, library_usage, css_sanitization
+- CI workflows for check, fmt, clippy, cross-platform tests, and crates.io publishing
+- Exit codes documented in `--help` output

@@ -345,9 +345,8 @@ fn fixture_path(name: &str) -> std::path::PathBuf {
 fn copy_fixture(fixture_name: &str, temp: &TempDir) -> std::path::PathBuf {
     let source = fixture_path(fixture_name);
     let dest = temp.path().join(fixture_name);
-    fs::copy(&source, &dest).unwrap_or_else(|e| {
-        panic!("Failed to copy fixture {}: {}", fixture_name, e)
-    });
+    fs::copy(&source, &dest)
+        .unwrap_or_else(|e| panic!("Failed to copy fixture {}: {}", fixture_name, e));
     dest
 }
 
@@ -406,15 +405,24 @@ fn test_notebook_to_html_simple() {
     let html = fs::read_to_string(&output).unwrap();
 
     // Verify markdown content was converted
-    assert!(html.contains("<h1>Simple Notebook</h1>"), "Should contain h1");
+    assert!(
+        html.contains("<h1>Simple Notebook</h1>"),
+        "Should contain h1"
+    );
     assert!(
         html.contains("simple Jupyter notebook"),
         "Should contain markdown text"
     );
 
     // Verify code was wrapped in code blocks
-    assert!(html.contains("<code") || html.contains("<pre"), "Should contain code elements");
-    assert!(html.contains("Hello, World!"), "Should contain code content");
+    assert!(
+        html.contains("<code") || html.contains("<pre"),
+        "Should contain code elements"
+    );
+    assert!(
+        html.contains("Hello, World!"),
+        "Should contain code content"
+    );
 
     // Verify conclusion section
     assert!(html.contains("<h2>Conclusion</h2>"), "Should contain h2");
@@ -488,7 +496,10 @@ fn test_notebook_to_html_mixed_cells() {
 
     // Check code elements - note: syntax highlighting may wrap words in spans
     // "import math" may appear as "<span>import</span> <span>math</span>"
-    assert!(html.contains("math"), "Should contain 'math' module reference");
+    assert!(
+        html.contains("math"),
+        "Should contain 'math' module reference"
+    );
     assert!(
         html.contains("factorial"),
         "Should contain 'factorial' function"

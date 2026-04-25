@@ -25,11 +25,26 @@ struct PaperSize {
     height: f64,
 }
 
-const PAPER_A4: PaperSize = PaperSize { width: 8.27, height: 11.69 };
-const PAPER_A3: PaperSize = PaperSize { width: 11.69, height: 16.54 };
-const PAPER_LETTER: PaperSize = PaperSize { width: 8.5, height: 11.0 };
-const PAPER_LEGAL: PaperSize = PaperSize { width: 8.5, height: 14.0 };
-const PAPER_TABLOID: PaperSize = PaperSize { width: 11.0, height: 17.0 };
+const PAPER_A4: PaperSize = PaperSize {
+    width: 8.27,
+    height: 11.69,
+};
+const PAPER_A3: PaperSize = PaperSize {
+    width: 11.69,
+    height: 16.54,
+};
+const PAPER_LETTER: PaperSize = PaperSize {
+    width: 8.5,
+    height: 11.0,
+};
+const PAPER_LEGAL: PaperSize = PaperSize {
+    width: 8.5,
+    height: 14.0,
+};
+const PAPER_TABLOID: PaperSize = PaperSize {
+    width: 11.0,
+    height: 17.0,
+};
 
 /// Wait for network activity to settle
 ///

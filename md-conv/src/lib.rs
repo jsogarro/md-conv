@@ -390,14 +390,20 @@ pub async fn run(args: Args) -> Result<(), ConversionError> {
             }
             // If explicit files requested failed, we error out
             if success_count == 0 {
-                return Err(ConversionError::Generic(format!("{} file(s) failed to convert", error_count)));
+                return Err(ConversionError::Generic(format!(
+                    "{} file(s) failed to convert",
+                    error_count
+                )));
             }
         }
     } else {
         // Quiet mode - only check for errors to return exit code
         let error_count = results.iter().filter(|r| r.status == "error").count();
         if error_count > 0 {
-            return Err(ConversionError::Generic(format!("{} file(s) failed to convert", error_count)));
+            return Err(ConversionError::Generic(format!(
+                "{} file(s) failed to convert",
+                error_count
+            )));
         }
     }
 
@@ -432,14 +438,16 @@ async fn run_watch_mode(args: Arc<Args>) -> Result<(), ConversionError> {
     // Watch inputs
     for input in &args.input {
         if input.exists() {
-            watcher.watch(input, RecursiveMode::NonRecursive)
+            watcher
+                .watch(input, RecursiveMode::NonRecursive)
                 .map_err(|e| ConversionError::Generic(e.to_string()))?;
         }
     }
     // Watch CSS if provided
     if let Some(css) = &args.css {
         if css.exists() {
-            watcher.watch(css, RecursiveMode::NonRecursive)
+            watcher
+                .watch(css, RecursiveMode::NonRecursive)
                 .map_err(|e| ConversionError::Generic(e.to_string()))?;
         }
     }

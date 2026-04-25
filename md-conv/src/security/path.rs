@@ -60,7 +60,10 @@ fn sanitize_path_for_display(path: &Path) -> String {
 /// - The file cannot be opened
 /// - The file descriptor's path cannot be resolved (platform limitation)
 /// - The resolved path escapes the allowed base directory
-pub(crate) async fn validate_and_open_file(path: &Path, allowed_base: &Path) -> Result<ValidatedFile> {
+pub(crate) async fn validate_and_open_file(
+    path: &Path,
+    allowed_base: &Path,
+) -> Result<ValidatedFile> {
     // 1. Open the file first - this gives us a file descriptor
     let file = File::open(path)
         .await
@@ -80,9 +83,10 @@ pub(crate) async fn validate_and_open_file(path: &Path, allowed_base: &Path) -> 
         .await;
 
     // Run the blocking syscall in a blocking thread pool to avoid blocking the async runtime
-    let canonical_path = tokio::task::spawn_blocking(move || get_canonical_path_from_file(&std_file))
-        .await
-        .context("Task to get canonical path panicked")??;
+    let canonical_path =
+        tokio::task::spawn_blocking(move || get_canonical_path_from_file(&std_file))
+            .await
+            .context("Task to get canonical path panicked")??;
 
     // 3. Validate the allowed base directory (this is safe to do with the original path)
     let canonical_base = tokio::fs::canonicalize(allowed_base)

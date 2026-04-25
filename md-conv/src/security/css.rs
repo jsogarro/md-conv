@@ -87,13 +87,14 @@ fn check_serialized_css_for_dangerous_urls(css: &str) -> Result<(), crate::error
 /// # Errors
 /// Returns an error if dangerous constructs (javascript: URLs, @import, etc.) are found.
 pub fn sanitize_css(css: &str) -> Result<String, crate::error::ConversionError> {
-    let mut stylesheet = StyleSheet::parse(css, ParserOptions::default())
-        .map_err(|e| crate::error::ConversionError::Security(format!("Failed to parse CSS: {}", e)))?;
+    let mut stylesheet = StyleSheet::parse(css, ParserOptions::default()).map_err(|e| {
+        crate::error::ConversionError::Security(format!("Failed to parse CSS: {}", e))
+    })?;
 
     // Visit and check for dangerous content (catches @import rules)
-    stylesheet
-        .visit(&mut SecurityVisitor)
-        .map_err(|e| crate::error::ConversionError::Security(format!("Security check failed: {}", e)))?;
+    stylesheet.visit(&mut SecurityVisitor).map_err(|e| {
+        crate::error::ConversionError::Security(format!("Security check failed: {}", e))
+    })?;
 
     // Minify and serialize
     let output = stylesheet
@@ -101,7 +102,9 @@ pub fn sanitize_css(css: &str) -> Result<String, crate::error::ConversionError> 
             minify: true,
             ..PrinterOptions::default()
         })
-        .map_err(|e| crate::error::ConversionError::Security(format!("Failed to serialize CSS: {}", e)))?;
+        .map_err(|e| {
+            crate::error::ConversionError::Security(format!("Failed to serialize CSS: {}", e))
+        })?;
 
     // Defense-in-depth: check serialized output for dangerous URL schemes
     // lightningcss normalizes escapes, so "javascript:" will appear in plain text
@@ -126,7 +129,10 @@ mod tests {
     fn test_dangerous_url_blocked() {
         let css = "body { background: url('javascript:alert(1)') }";
         let result = sanitize_css(css);
-        assert!(result.is_err(), "CSS with javascript: should be REJECTED by defense-in-depth");
+        assert!(
+            result.is_err(),
+            "CSS with javascript: should be REJECTED by defense-in-depth"
+        );
     }
 
     #[test]

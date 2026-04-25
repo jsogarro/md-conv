@@ -56,7 +56,9 @@ pub struct ParsedDocument {
 /// assert!(body.contains("Hello World"));
 /// assert!(body.contains("This is the body"));
 /// ```
-pub fn parse_front_matter(content: &str) -> Result<(FrontMatter, String), crate::error::ConversionError> {
+pub fn parse_front_matter(
+    content: &str,
+) -> Result<(FrontMatter, String), crate::error::ConversionError> {
     let matter = Matter::<YAML>::new();
     let parsed = matter.parse(content);
 
@@ -64,7 +66,9 @@ pub fn parse_front_matter(content: &str) -> Result<(FrontMatter, String), crate:
         .data
         .map(|fm_data| fm_data.deserialize())
         .transpose()
-        .map_err(|e| crate::error::ConversionError::Parse(format!("Invalid front matter YAML: {}", e)))?
+        .map_err(|e| {
+            crate::error::ConversionError::Parse(format!("Invalid front matter YAML: {}", e))
+        })?
         .unwrap_or_default();
 
     Ok((front_matter, parsed.content))
@@ -261,8 +265,9 @@ struct Cell {
 
 /// Extracts raw Markdown from a Jupyter Notebook.
 pub fn parse_notebook_raw(content: &str) -> Result<String, crate::error::ConversionError> {
-    let notebook: Notebook = serde_json::from_str(content)
-        .map_err(|e| crate::error::ConversionError::Notebook(format!("Invalid Jupyter Notebook JSON: {}", e)))?;
+    let notebook: Notebook = serde_json::from_str(content).map_err(|e| {
+        crate::error::ConversionError::Notebook(format!("Invalid Jupyter Notebook JSON: {}", e))
+    })?;
 
     let mut markdown = String::with_capacity(content.len());
     for cell in notebook.cells {
@@ -427,12 +432,7 @@ author: "O'Brien & Sons"
 ---
 # Content"#;
         let doc = parse_markdown(content).unwrap();
-        assert!(doc
-            .front_matter
-            .title
-            .as_ref()
-            .unwrap()
-            .contains("Quoted"));
+        assert!(doc.front_matter.title.as_ref().unwrap().contains("Quoted"));
         assert!(doc
             .front_matter
             .author

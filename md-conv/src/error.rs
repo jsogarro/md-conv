@@ -68,11 +68,8 @@ mod tests {
     fn test_exit_codes() {
         assert_eq!(ConversionError::Generic("test".into()).exit_code(), 1);
         assert_eq!(
-            ConversionError::Io(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                "file"
-            ))
-            .exit_code(),
+            ConversionError::Io(std::io::Error::new(std::io::ErrorKind::NotFound, "file"))
+                .exit_code(),
             2
         );
         assert_eq!(ConversionError::Parse("bad markdown".into()).exit_code(), 3);
@@ -104,8 +101,7 @@ mod tests {
 
     #[test]
     fn test_from_io_error() {
-        let io_err =
-            std::io::Error::new(std::io::ErrorKind::PermissionDenied, "access denied");
+        let io_err = std::io::Error::new(std::io::ErrorKind::PermissionDenied, "access denied");
         let conv_err: ConversionError = io_err.into();
         assert!(matches!(conv_err, ConversionError::Io(_)));
         assert_eq!(conv_err.exit_code(), 2);
@@ -117,7 +113,8 @@ mod tests {
         let mut hb = handlebars::Handlebars::new();
         // Use strict mode to make missing variables an error
         hb.set_strict_mode(true);
-        hb.register_template_string("test", "{{missing_var}}").unwrap();
+        hb.register_template_string("test", "{{missing_var}}")
+            .unwrap();
         let data = serde_json::json!({});
         let render_result = hb.render("test", &data);
 
@@ -153,7 +150,10 @@ mod tests {
         assert_eq!(config_err.to_string(), "Configuration error: invalid yaml");
 
         let notebook_err = ConversionError::Notebook("invalid json".into());
-        assert_eq!(notebook_err.to_string(), "Notebook parse error: invalid json");
+        assert_eq!(
+            notebook_err.to_string(),
+            "Notebook parse error: invalid json"
+        );
 
         let generic_err = ConversionError::Generic("something failed".into());
         assert_eq!(generic_err.to_string(), "something failed");
