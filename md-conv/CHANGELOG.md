@@ -32,3 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Example programs: basic_conversion, html_output, library_usage, css_sanitization
 - CI workflows for check, fmt, clippy, cross-platform tests, and crates.io publishing
 - Exit codes documented in `--help` output
+- CLI validation for zero timeout and file size values
+- `blob:` URL scheme blocked in CSS sanitization
+- Case-insensitive `.ipynb` extension matching
+- Warning log when syntax highlighting fails
+- Browser pool shutdown on watch mode exit
