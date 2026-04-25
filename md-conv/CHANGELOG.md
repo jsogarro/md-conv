@@ -1,0 +1,28 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [0.1.0] - 2026-04-25
+
+### Added
+- Markdown to PDF conversion via Headless Chrome with browser pooling
+- Markdown to HTML conversion with template support
+- Jupyter Notebook (.ipynb) conversion to PDF and HTML
+- YAML front matter for per-document configuration
+- Custom CSS support with CSS sanitization (lightningcss)
+- HTML sanitization (ammonia) for XSS prevention
+- TOCTOU-safe path validation (Linux, macOS, Windows)
+- Content Security Policy meta tags in HTML output
+- Syntect-based syntax highlighting for code blocks
+- Automatic Table of Contents generation
+- Watch mode for live preview on file changes
+- Batch processing with concurrent file conversion
+- stdin/stdout pipeline support
+- JSON output mode for scripting
+- Progress bar for batch operations
+- Configurable PDF options (format, margins, scale, landscape, background)

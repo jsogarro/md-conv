@@ -1,6 +1,6 @@
 [package]
 name = "md-conv"
-version = "1.0.0"
+version = "0.1.0"
 edition = "2021"
 rust-version = "1.75"
 description = "Convert Markdown to PDF and HTML with front matter and custom CSS"
