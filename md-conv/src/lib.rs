@@ -43,7 +43,7 @@ const MAX_CONCURRENT_CONVERSIONS: usize = 4;
 
 /// Source of the input content.
 #[derive(Debug, Clone)]
-pub enum InputSource {
+pub(crate) enum InputSource {
     File(PathBuf),
     Stdin,
 }
@@ -247,7 +247,7 @@ pub async fn convert_file(input_path: &Path, args: &Args) -> anyhow::Result<Vec<
 
 /// Main entry point for the conversion tool.
 #[instrument(skip(args), name = "md_conv")]
-pub async fn run(args: Args) -> anyhow::Result<()> {
+pub async fn run(args: Args) -> Result<(), ConversionError> {
     let args = Arc::new(args);
 
     // Watch mode hook
@@ -270,7 +270,8 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
         let pb = ProgressBar::new(num_inputs);
         pb.set_style(ProgressStyle::with_template(
             "{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta}) {msg}",
-        )?
+        )
+        .map_err(|e| ConversionError::Generic(e.to_string()))?
         .progress_chars("#>-"));
         Some(pb)
     } else {
@@ -322,7 +323,8 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
     let results = results.lock().await;
 
     if args.json {
-        let json_output = serde_json::to_string_pretty(&*results)?;
+        let json_output = serde_json::to_string_pretty(&*results)
+            .map_err(|e| ConversionError::Generic(e.to_string()))?;
         println!("{}", json_output);
     } else if !args.quiet {
         // Standard textual summary
@@ -348,14 +350,14 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
             }
             // If explicit files requested failed, we error out
             if success_count == 0 {
-                anyhow::bail!("{} file(s) failed to convert", error_count);
+                return Err(ConversionError::Generic(format!("{} file(s) failed to convert", error_count)));
             }
         }
     } else {
         // Quiet mode - only check for errors to return exit code
         let error_count = results.iter().filter(|r| r.status == "error").count();
         if error_count > 0 {
-            anyhow::bail!("{} file(s) failed to convert", error_count);
+            return Err(ConversionError::Generic(format!("{} file(s) failed to convert", error_count)));
         }
     }
 
@@ -366,7 +368,7 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
 }
 
 /// Watch mode loop
-async fn run_watch_mode(args: Arc<Args>) -> anyhow::Result<()> {
+async fn run_watch_mode(args: Arc<Args>) -> Result<(), ConversionError> {
     info!("Starting watch mode...");
     let (tx, mut rx) = tokio::sync::mpsc::channel(100);
 
@@ -384,18 +386,21 @@ async fn run_watch_mode(args: Arc<Args>) -> anyhow::Result<()> {
             }
             Err(e) => tracing::error!("Watch error: {:?}", e),
         }
-    })?;
+    })
+    .map_err(|e| ConversionError::Generic(e.to_string()))?;
 
     // Watch inputs
     for input in &args.input {
         if input.exists() {
-            watcher.watch(input, RecursiveMode::NonRecursive)?;
+            watcher.watch(input, RecursiveMode::NonRecursive)
+                .map_err(|e| ConversionError::Generic(e.to_string()))?;
         }
     }
     // Watch CSS if provided
     if let Some(css) = &args.css {
         if css.exists() {
-            watcher.watch(css, RecursiveMode::NonRecursive)?;
+            watcher.watch(css, RecursiveMode::NonRecursive)
+                .map_err(|e| ConversionError::Generic(e.to_string()))?;
         }
     }
 

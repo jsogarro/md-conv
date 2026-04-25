@@ -57,7 +57,7 @@ const PAPER_TABLOID: PaperSize = PaperSize { width: 11.0, height: 17.0 };
 /// - **Lifecycle**: Recycles browsers based on age (`BROWSER_MAX_AGE_SECS`) or
 ///   usage count (`BROWSER_MAX_RENDERS`) to avoid memory leaks.
 /// - **Cleanup**: Gracefully shuts down all instances on demand.
-pub struct BrowserPool {
+pub(crate) struct BrowserPool {
     inner: Arc<BrowserPoolInner>,
 }
 
@@ -126,7 +126,7 @@ impl PooledBrowser {
 ///
 /// When the lease is dropped or explicitly released, the browser is returned
 /// to the pool for reuse, or recycled if it has exceeded its lifespan.
-pub struct BrowserLease {
+pub(crate) struct BrowserLease {
     browser: Option<PooledBrowser>,
     pool: Arc<BrowserPoolInner>,
     /// Holds the semaphore permit for the duration of the lease.
@@ -170,11 +170,13 @@ impl Drop for BrowserLease {
     }
 }
 
+#[allow(dead_code)]
 struct BrowserPoolConfig {
     chrome_path: Option<PathBuf>,
     timeout_secs: u64,
 }
 
+#[allow(dead_code)]
 struct BrowserPoolInner {
     available: Mutex<Vec<PooledBrowser>>,
     config: Mutex<BrowserPoolConfig>,
@@ -216,6 +218,7 @@ impl BrowserPoolInner {
     }
 }
 
+#[allow(dead_code)]
 impl BrowserPool {
     /// Creates a new, empty browser pool.
     pub fn new() -> Self {
@@ -384,7 +387,7 @@ impl Default for BrowserPool {
 static BROWSER_POOL: std::sync::OnceLock<BrowserPool> = std::sync::OnceLock::new();
 
 /// Get the global browser pool
-pub fn browser_pool() -> &'static BrowserPool {
+pub(crate) fn browser_pool() -> &'static BrowserPool {
     BROWSER_POOL.get_or_init(BrowserPool::new)
 }
 

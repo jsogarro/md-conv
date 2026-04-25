@@ -24,7 +24,7 @@ fn get_handlebars() -> &'static Handlebars<'static> {
 /// The `content` field contains the pre-rendered HTML fragment from the
 /// Markdown parser.
 #[derive(Debug, Serialize)]
-pub struct TemplateContext<'a> {
+pub(crate) struct TemplateContext<'a> {
     /// Document title.
     pub title: Option<&'a str>,
     /// Document author.
@@ -54,7 +54,7 @@ pub struct TemplateContext<'a> {
 /// # Errors
 /// Returns an error if the Handlebars rendering engine fails.
 #[instrument(skip_all)]
-pub fn render_html(ctx: TemplateContext<'_>) -> anyhow::Result<String> {
+pub(crate) fn render_html(ctx: TemplateContext<'_>) -> anyhow::Result<String> {
     let hb = get_handlebars();
     let html = hb.render("base", &ctx)?;
     tracing::debug!(html_len = html.len(), "Rendered HTML template");
@@ -62,7 +62,7 @@ pub fn render_html(ctx: TemplateContext<'_>) -> anyhow::Result<String> {
 }
 
 /// Transforms a `ParsedDocument` and `ConversionConfig` into a `TemplateContext`.
-pub fn create_context<'a>(
+pub(crate) fn create_context<'a>(
     doc: &'a crate::parser::ParsedDocument,
     config: &'a crate::config::ConversionConfig,
 ) -> TemplateContext<'a> {

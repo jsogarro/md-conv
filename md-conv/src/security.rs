@@ -219,11 +219,11 @@ fn sanitize_path_for_display(path: &Path) -> String {
 
 /// A handle to a file that has been verified to reside within an allowed directory.
 #[derive(Debug)]
-pub struct ValidatedFile {
+pub(crate) struct ValidatedFile {
     /// The open, readable file handle.
-    pub file: File,
+    pub(crate) file: File,
     /// The absolute, resolved path to the file.
-    pub canonical_path: std::path::PathBuf,
+    pub(crate) canonical_path: std::path::PathBuf,
 }
 
 impl ValidatedFile {
@@ -265,7 +265,7 @@ impl ValidatedFile {
 /// - The file cannot be opened
 /// - The file descriptor's path cannot be resolved (platform limitation)
 /// - The resolved path escapes the allowed base directory
-pub async fn validate_and_open_file(path: &Path, allowed_base: &Path) -> Result<ValidatedFile> {
+pub(crate) async fn validate_and_open_file(path: &Path, allowed_base: &Path) -> Result<ValidatedFile> {
     // 1. Open the file first - this gives us a file descriptor
     let file = File::open(path)
         .await
@@ -319,7 +319,8 @@ pub async fn validate_and_open_file(path: &Path, allowed_base: &Path) -> Result<
 
 /// Legacy wrapper for compatibility - validates path without opening
 #[deprecated(note = "Use validate_and_open_file() to prevent TOCTOU vulnerabilities")]
-pub async fn validate_path_safety(path: &Path, allowed_base: &Path) -> Result<()> {
+#[allow(dead_code)]
+pub(crate) async fn validate_path_safety(path: &Path, allowed_base: &Path) -> Result<()> {
     let canonical_path = tokio::fs::canonicalize(path)
         .await
         .with_context(|| format!("Cannot resolve path: {}", sanitize_path_for_display(path)))?;
@@ -375,14 +376,14 @@ impl<'i> Visitor<'i> for SecurityVisitor {
 
 /// Check the serialized CSS output for any dangerous URL schemes.
 /// This is a defense-in-depth measure in case the visitor doesn't catch all URLs.
-fn check_serialized_css_for_dangerous_urls(css: &str) -> Result<()> {
+fn check_serialized_css_for_dangerous_urls(css: &str) -> Result<(), crate::error::ConversionError> {
     let lower = css.to_lowercase();
     for scheme in DANGEROUS_URL_SCHEMES {
         if lower.contains(scheme) {
-            bail!(
+            return Err(crate::error::ConversionError::Security(format!(
                 "CSS contains dangerous URL scheme: '{}'. This is blocked for security reasons.",
                 scheme.trim_end_matches(':')
-            );
+            )));
         }
     }
     Ok(())
@@ -396,14 +397,14 @@ fn check_serialized_css_for_dangerous_urls(css: &str) -> Result<()> {
 ///
 /// # Errors
 /// Returns an error if dangerous constructs (javascript: URLs, @import, etc.) are found.
-pub fn sanitize_css(css: &str) -> Result<String> {
+pub fn sanitize_css(css: &str) -> Result<String, crate::error::ConversionError> {
     let mut stylesheet = StyleSheet::parse(css, ParserOptions::default())
-        .map_err(|e| anyhow::anyhow!("Failed to parse CSS: {}", e))?;
+        .map_err(|e| crate::error::ConversionError::Security(format!("Failed to parse CSS: {}", e)))?;
 
     // Visit and check for dangerous content (catches @import rules)
     stylesheet
         .visit(&mut SecurityVisitor)
-        .map_err(|e| anyhow::anyhow!("Security check failed: {}", e))?;
+        .map_err(|e| crate::error::ConversionError::Security(format!("Security check failed: {}", e)))?;
 
     // Minify and serialize
     let output = stylesheet
@@ -411,7 +412,7 @@ pub fn sanitize_css(css: &str) -> Result<String> {
             minify: true,
             ..PrinterOptions::default()
         })
-        .map_err(|e| anyhow::anyhow!("Failed to serialize CSS: {}", e))?;
+        .map_err(|e| crate::error::ConversionError::Security(format!("Failed to serialize CSS: {}", e)))?;
 
     // Defense-in-depth: check serialized output for dangerous URL schemes
     // lightningcss normalizes escapes, so "javascript:" will appear in plain text
@@ -421,7 +422,7 @@ pub fn sanitize_css(css: &str) -> Result<String> {
 }
 
 /// Validates that a file's size is within a specified limit before opening it fully.
-pub async fn validate_file_size(path: &Path, max_bytes: u64) -> Result<File> {
+pub(crate) async fn validate_file_size(path: &Path, max_bytes: u64) -> Result<File> {
     let file = File::open(path)
         .await
         .with_context(|| format!("Cannot open file: {}", sanitize_path_for_display(path)))?;

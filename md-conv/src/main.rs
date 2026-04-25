@@ -27,8 +27,8 @@ async fn main() {
     }
 
     // Run conversion
-    if let Err(_e) = md_conv::run(args).await {
+    if let Err(e) = md_conv::run(args).await {
         // Error already logged via tracing
-        std::process::exit(1);
+        std::process::exit(e.exit_code());
     }
 }

@@ -10,7 +10,7 @@
 pub mod html;
 pub mod pdf;
 
-pub use pdf::browser_pool;
+pub(crate) use pdf::browser_pool;
 
 use std::path::Path;
 

@@ -23,7 +23,18 @@ pub enum OutputFormat {
     md-conv document.md                    # Convert to PDF (default)
     md-conv document.md -f html            # Convert to HTML
     md-conv document.md -f pdf,html        # Convert to both formats
-    md-conv doc1.md doc2.md                # Batch convert multiple files")]
+    md-conv doc1.md doc2.md                # Batch convert multiple files
+
+EXIT CODES:
+    0    Success
+    1    General error
+    2    I/O error (file not found, permission denied)
+    3    Markdown parse error
+    4    Configuration error
+    5    Security violation (path escape, malicious CSS)
+    6    Template rendering error
+    7    Browser/Chrome error
+    8    Notebook parse error")]
 pub struct Args {
     /// Input Markdown file(s)
     #[arg(required_unless_present = "stdin")]
