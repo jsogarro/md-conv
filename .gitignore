@@ -2,3 +2,15 @@
 **/*.rs.bk
 .DS_Store
 .claude/
+
+# AI artifacts — never commit
+ai/
+@reviews/
+plans/
+CLAUDE.md
+*.bak
+
+# Build artifacts
+*.html
+*.pdf
+!md-conv/templates/*.html
