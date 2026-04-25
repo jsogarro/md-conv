@@ -30,8 +30,8 @@ cargo install md-conv
 ### From source
 
 ```bash
-git clone https://github.com/ogarro/markdown_converter
-cd markdown_converter/md-conv
+git clone https://github.com/jsogarro/md-conv
+cd md-conv/md-conv
 cargo install --path .
 ```
 

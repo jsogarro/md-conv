@@ -1,6 +1,6 @@
 # md-conv
 
-[![CI](https://github.com/jsogarro/markdown_converter/actions/workflows/ci.yml/badge.svg)](https://github.com/jsogarro/markdown_converter/actions/workflows/ci.yml)
+[![CI](https://github.com/jsogarro/md-conv/actions/workflows/ci.yml/badge.svg)](https://github.com/jsogarro/md-conv/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 A fast, secure Markdown to PDF and HTML converter built in Rust.
@@ -33,7 +33,7 @@ and batch processing.
 ### From source
 
 ```bash
-git clone https://github.com/jsogarro/markdown_converter.git
+git clone https://github.com/jsogarro/md-conv.git
 cd markdown_converter/md-conv
 cargo install --path .
 ```
