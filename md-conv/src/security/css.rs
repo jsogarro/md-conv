@@ -62,9 +62,22 @@ fn check_serialized_css_for_dangerous_urls(css: &str) -> Result<(), crate::error
 
 /// Sanitizes CSS content to remove potentially dangerous constructs using `lightningcss`.
 ///
-/// This uses a full CSS parser to safely handle obfuscated attacks that regex might miss.
-/// After parsing and visiting, it also checks the serialized output for any remaining
-/// dangerous patterns as a defense-in-depth measure.
+/// This function implements defense-in-depth CSS sanitization:
+/// 1. Parses CSS with `lightningcss` (full CSS3 parser, handles obfuscation)
+/// 2. Visits all URLs and rules to block dangerous patterns
+/// 3. Minifies and serializes the validated CSS
+/// 4. Performs a final check on serialized output for escaped URL schemes
+///
+/// # Defense Approach
+///
+/// Using a full parser (not regex) prevents bypasses via CSS escapes, unicode tricks,
+/// or comments. For example, `\6a\61vascript:alert(1)` is normalized by the parser
+/// before our visitor sees it.
+///
+/// Blocked constructs:
+/// - `@import` rules (could load external malicious CSS)
+/// - `javascript:`, `vbscript:`, `data:`, `file:`, `blob:` URL schemes
+/// - Any obfuscated variants of the above
 ///
 /// # Examples
 ///

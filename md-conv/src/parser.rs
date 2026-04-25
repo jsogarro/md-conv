@@ -26,13 +26,15 @@ pub fn get_theme(theme_name: &str) -> &'static Theme {
 }
 
 /// A document that has been fully processed.
+///
+/// This struct contains the parsed components of a markdown document ready for template rendering.
 #[derive(Debug)]
 pub struct ParsedDocument {
-    /// Metadata and configuration extracted from YAML front matter.
+    /// Metadata and configuration extracted from YAML front matter (or defaults).
     pub front_matter: FrontMatter,
-    /// The generated HTML fragment from the Markdown body.
+    /// The generated HTML fragment from the Markdown body (syntax highlighted, sanitized).
     pub html_content: String,
-    /// Generated Table of Contents HTML.
+    /// Generated Table of Contents HTML (extracted from heading structure).
     pub toc_html: Option<String>,
 }
 
@@ -75,6 +77,27 @@ pub fn parse_front_matter(
 }
 
 /// Converts Markdown body to HTML with syntax highlighting and TOC.
+///
+/// This function:
+/// 1. Parses markdown with GFM extensions (tables, task lists, footnotes)
+/// 2. Applies syntax highlighting to code blocks using syntect
+/// 3. Sanitizes HTML output with ammonia to prevent XSS
+/// 4. Generates a table of contents from headings
+///
+/// # Arguments
+///
+/// - `content`: Raw markdown body (without front matter)
+/// - `theme_name`: Syntect theme name (e.g., "base16-ocean.dark", "Solarized (dark)")
+///
+/// # Returns
+///
+/// A tuple of `(html_content, toc_html)` where both are sanitized HTML strings.
+///
+/// # Valid Theme Names
+///
+/// See syntect's default themes: "base16-ocean.dark", "base16-ocean.light",
+/// "InspiredGitHub", "Solarized (dark)", "Solarized (light)", etc.
+/// Invalid theme names fall back to "base16-ocean.dark" with a warning.
 #[instrument(skip(content))]
 pub fn generate_html(content: &str, theme_name: &str) -> anyhow::Result<(String, String)> {
     let ss = get_syntax_set();
@@ -266,6 +289,23 @@ struct Cell {
 }
 
 /// Extracts raw Markdown from a Jupyter Notebook.
+///
+/// Converts a `.ipynb` JSON file into markdown by:
+/// - Concatenating all "markdown" cells as-is
+/// - Wrapping "code" cells in ```python fenced code blocks
+/// - Ignoring output cells and metadata
+///
+/// # Arguments
+///
+/// - `content`: The raw JSON content of a `.ipynb` file
+///
+/// # Returns
+///
+/// A markdown string suitable for parsing with `parse_front_matter()` and `generate_html()`.
+///
+/// # Errors
+///
+/// Returns `ConversionError::Notebook` if the JSON structure is invalid.
 pub fn parse_notebook_raw(content: &str) -> Result<String, crate::error::ConversionError> {
     let notebook: Notebook = serde_json::from_str(content).map_err(|e| {
         crate::error::ConversionError::Notebook(format!("Invalid Jupyter Notebook JSON: {}", e))

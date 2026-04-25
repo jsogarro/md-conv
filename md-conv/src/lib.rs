@@ -12,6 +12,38 @@
 //! - **Security Focused**: Implements CSS sanitization, path escape protection, and file size limits.
 //! - **Concurrent Processing**: Automatically processes multiple files in parallel with bounded resource usage.
 //!
+//! ## Modules
+//! - [`cli`] - Command-line argument parsing with clap
+//! - [`config`] - Configuration merging (CLI, front matter, config file)
+//! - [`parser`] - Markdown parsing, front matter extraction, syntax highlighting
+//! - [`renderer`] - Output format renderers (HTML, PDF)
+//! - [`security`] - CSS/HTML sanitization and TOCTOU-safe path validation
+//! - [`template`] - Handlebars template rendering
+//! - [`error`] - Error types and conversions
+//!
+//! ## Security
+//!
+//! This crate implements defense-in-depth security:
+//!
+//! - **TOCTOU-Safe Path Validation**: Uses platform-specific file descriptor to path resolution
+//!   (fcntl on macOS, /proc/self/fd on Linux) to prevent race conditions where an attacker
+//!   replaces a validated file with a symlink before it's opened.
+//! - **CSS Sanitization**: Parses and validates CSS with lightningcss to block dangerous URL
+//!   schemes (javascript:, data:, file:) and @import rules.
+//! - **HTML Sanitization**: Strips XSS vectors using ammonia before rendering.
+//! - **File Size Limits**: Prevents resource exhaustion from maliciously large inputs.
+//!
+//! ## Features
+//!
+//! - **Markdown Extensions**: GFM (tables, task lists, strikethrough), footnotes, smart punctuation
+//! - **Syntax Highlighting**: Code blocks highlighted with syntect (50+ themes)
+//! - **Front Matter**: YAML front matter for metadata and configuration
+//! - **Watch Mode**: Live recompilation on file changes
+//! - **Batch Processing**: Concurrent conversion of multiple files
+//! - **Custom CSS**: Inject custom stylesheets (validated and sanitized)
+//! - **PDF Options**: Margin, page size, landscape, headers/footers
+//! - **Table of Contents**: Auto-generated from document headings
+//!
 //! ## Quick Start (CLI-style)
 //!
 //! ```rust,no_run

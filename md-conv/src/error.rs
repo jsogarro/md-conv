@@ -1,29 +1,47 @@
 use thiserror::Error;
 
-/// Library-level errors with structured types
+/// Library-level errors with structured types for md-conv operations.
+///
+/// Each variant maps to a specific exit code for CLI error reporting.
 #[derive(Error, Debug)]
 pub enum ConversionError {
+    /// Returned when handlebars template rendering fails (exit code 6).
     #[error("Template rendering failed: {0}")]
     Template(#[from] handlebars::RenderError),
 
+    /// Returned when markdown content cannot be parsed (exit code 3).
+    ///
+    /// This includes malformed front matter YAML and invalid markdown structures.
     #[error("Markdown parse error: {0}")]
     Parse(String),
 
+    /// Returned when Chrome/Chromium fails to render PDF (exit code 7).
+    ///
+    /// Common causes: browser not found, timeout, page load errors.
     #[error("Browser error: {0}")]
     Browser(String),
 
+    /// Returned when security validation fails (exit code 5).
+    ///
+    /// Includes path escape attempts, malicious CSS, dangerous URL schemes.
     #[error("Security violation: {0}")]
     Security(String),
 
+    /// Returned for file system errors (exit code 2).
+    ///
+    /// Includes file not found, permission denied, disk full.
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
 
+    /// Returned when configuration is invalid or cannot be loaded (exit code 4).
     #[error("Configuration error: {0}")]
     Config(String),
 
+    /// Returned when Jupyter Notebook JSON is malformed (exit code 8).
     #[error("Notebook parse error: {0}")]
     Notebook(String),
 
+    /// Generic error for all other cases (exit code 1).
     #[error("{0}")]
     Generic(String),
 }

@@ -6,9 +6,15 @@ use std::path::PathBuf;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum OutputFormat {
-    /// Portable Document Format (Headless Chrome required)
+    /// Portable Document Format rendered via Headless Chrome.
+    ///
+    /// Requires Chrome or Chromium installed on the system. Produces pixel-perfect
+    /// PDFs with full CSS and layout support. Use for final, print-ready documents.
     Pdf,
-    /// Standard HTML5 document
+    /// Standard HTML5 document with embedded CSS and syntax highlighting.
+    ///
+    /// Self-contained HTML file suitable for web hosting or archiving. Can be opened
+    /// directly in a browser without additional dependencies.
     Html,
 }
 
@@ -122,6 +128,14 @@ pub struct Args {
 }
 
 impl Default for Args {
+    /// Creates Args with default values.
+    ///
+    /// Defaults:
+    /// - `format`: None (defaults to PDF during config merge)
+    /// - `max_file_size`: 10 MB
+    /// - `timeout`: 30 seconds
+    /// - `allow_external_css`: false (only CSS within input directory)
+    /// - `no_sandbox`: false (Chrome sandbox enabled)
     fn default() -> Self {
         Self {
             input: Vec::new(),

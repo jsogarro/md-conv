@@ -16,11 +16,13 @@ pub(crate) use browser::browser_pool;
 use std::path::Path;
 
 /// The result of a successful rendering operation.
+///
+/// Contains the final output bytes and the appropriate file extension for writing to disk.
 #[derive(Debug)]
 pub struct RenderOutput {
-    /// Raw binary content of the generated file.
+    /// Raw binary content of the generated file (UTF-8 for HTML, binary for PDF).
     pub bytes: Vec<u8>,
-    /// Standard file extension for this format (e.g., "pdf").
+    /// Standard file extension for this format without the dot (e.g., "pdf", "html").
     pub extension: &'static str,
 }
 
@@ -28,12 +30,30 @@ pub struct RenderOutput {
 ///
 /// Implementations must be `Send` and `Sync` to support concurrent processing.
 ///
-/// Note: We use the `async_trait` crate because native Rust async traits (1.75+)
+/// # Implementation Contract
+///
+/// - `render()`: Must be idempotent - calling it multiple times with the same input
+///   should produce the same output.
+/// - `extension()`: Should return a lowercase extension without the leading dot.
+/// - `name()`: Should return a human-readable format name for logging.
+///
+/// # Why async_trait?
+///
+/// We use the `async_trait` crate because native Rust async traits (1.75+)
 /// do not yet support dynamic dispatch (`dyn Renderer`), which is required for
-/// our multi-format processing loop.
+/// our multi-format processing loop in `lib.rs`.
 #[async_trait::async_trait]
 pub trait Renderer: Send + Sync {
     /// Converts intermediate HTML into the final output format.
+    ///
+    /// # Arguments
+    ///
+    /// - `html`: Complete HTML document (including `<html>`, `<head>`, `<body>` tags)
+    /// - `config`: Merged configuration with PDF options, CSS, etc.
+    ///
+    /// # Returns
+    ///
+    /// `RenderOutput` containing the final bytes and file extension.
     async fn render(
         &self,
         html: &str,
@@ -48,6 +68,16 @@ pub trait Renderer: Send + Sync {
 }
 
 /// Factory function to instantiate the appropriate renderer for a given format.
+///
+/// # Usage
+///
+/// ```no_run
+/// use md_conv::cli::OutputFormat;
+/// use md_conv::renderer::create_renderer;
+///
+/// let renderer = create_renderer(&OutputFormat::Pdf);
+/// assert_eq!(renderer.extension(), "pdf");
+/// ```
 pub fn create_renderer(format: &crate::cli::OutputFormat) -> Box<dyn Renderer> {
     match format {
         crate::cli::OutputFormat::Html => Box::new(html::HtmlRenderer),

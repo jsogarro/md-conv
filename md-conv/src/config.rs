@@ -4,32 +4,49 @@ use std::path::{Path, PathBuf};
 /// PDF-specific rendering options typically provided in Markdown front matter.
 ///
 /// These options map to Headless Chrome's `PrintToPDF` parameters.
+///
+/// # Valid Values
+///
+/// - `format`: "A4", "Letter", "Legal", "Tabloid", "Ledger", "A3", "A5"
+/// - Margins: Any CSS unit (e.g., "20mm", "1in", "0.5cm", "10px")
+/// - `scale`: Range 0.1 to 2.0 (1.0 = 100% size)
+///
+/// # Examples
+///
+/// ```yaml
+/// pdf_options:
+///   format: "A4"
+///   margin: "20mm"
+///   landscape: false
+///   print_background: true
+///   scale: 1.0
+/// ```
 #[derive(Debug, Clone, Deserialize, Default)]
 #[serde(default)]
 pub struct PdfOptions {
-    /// Page format: A4, Letter, Legal, etc.
+    /// Page format: A4, Letter, Legal, Tabloid, etc.
     pub format: Option<String>,
-    /// Top margin in CSS units (e.g., "20mm", "1in").
+    /// Top margin in CSS units (e.g., "20mm", "1in"). Overrides `margin`.
     pub margin_top: Option<String>,
-    /// Bottom margin in CSS units.
+    /// Bottom margin in CSS units. Overrides `margin`.
     pub margin_bottom: Option<String>,
-    /// Left margin in CSS units.
+    /// Left margin in CSS units. Overrides `margin`.
     pub margin_left: Option<String>,
-    /// Right margin in CSS units.
+    /// Right margin in CSS units. Overrides `margin`.
     pub margin_right: Option<String>,
-    /// Shorthand for all margins. Individual margins take precedence.
+    /// Shorthand for all margins. Individual margin_* fields take precedence.
     pub margin: Option<String>,
     /// Whether to print background graphics. Defaults to `true`.
     #[serde(default = "default_true")]
     pub print_background: bool,
-    /// Whether to use landscape orientation. Defaults to `false`.
+    /// Whether to use landscape orientation. Defaults to `false` (portrait).
     pub landscape: bool,
-    /// Scale factor of the page rendering (0.1 to 2.0). Defaults to `1.0`.
+    /// Scale factor of the page rendering. Valid range: 0.1 to 2.0. Defaults to `1.0`.
     #[serde(default = "default_scale")]
     pub scale: f64,
-    /// Optional HTML template for the page header.
+    /// Optional HTML template for the page header. Use `<span class="pageNumber">` for page numbers.
     pub header_template: Option<String>,
-    /// Optional HTML template for the page footer.
+    /// Optional HTML template for the page footer. Use `<span class="pageNumber">` for page numbers.
     pub footer_template: Option<String>,
 }
 
@@ -41,26 +58,47 @@ fn default_scale() -> f64 {
 }
 
 /// Metadata and options extracted from the Markdown document's YAML front matter.
+///
+/// # YAML Schema
+///
+/// ```yaml
+/// ---
+/// title: "Document Title"
+/// author: "Author Name"
+/// date: "2024-01-15"
+/// description: "A brief abstract"
+/// keywords:
+///   - markdown
+///   - pdf
+/// lang: "en"
+/// highlight_theme: "Solarized (dark)"
+/// css: "./styles/custom.css"  # or inline CSS
+/// pdf_options:
+///   format: "A4"
+///   margin: "20mm"
+///   landscape: false
+/// ---
+/// ```
 #[derive(Debug, Clone, Deserialize, Default)]
 #[serde(default)]
 pub struct FrontMatter {
-    /// Title of the document.
+    /// Title of the document. Used in HTML `<title>` and PDF metadata.
     pub title: Option<String>,
-    /// Author of the document.
+    /// Author of the document. Used in PDF metadata.
     pub author: Option<String>,
-    /// Publication or creation date.
+    /// Publication or creation date (free-form string).
     pub date: Option<String>,
-    /// Short description/abstract for metadata.
+    /// Short description/abstract for HTML <meta> and PDF metadata.
     pub description: Option<String>,
-    /// Keywords for SEO and metadata.
+    /// Keywords for SEO and metadata. Used in HTML <meta name="keywords">.
     pub keywords: Option<Vec<String>>,
-    /// Path to a CSS file or a literal block of CSS rules.
+    /// Path to a CSS file (relative to input) or literal CSS rules.
     pub css: Option<String>,
     /// Rendering options specific to PDF output.
     pub pdf_options: PdfOptions,
-    /// Document language code (e.g., "en", "ja").
+    /// Document language code (e.g., "en", "ja", "fr"). Used in HTML lang attribute.
     pub lang: Option<String>,
-    /// Syntax highlighting theme (e.g., "base16-ocean.dark").
+    /// Syntax highlighting theme. See syntect documentation for available themes.
     pub highlight_theme: Option<String>,
 }
 
@@ -82,6 +120,14 @@ pub struct ConfigFile {
 /// The final, validated configuration used for the conversion process.
 ///
 /// This struct is created by merging CLI arguments with document front matter.
+///
+/// # Merge Precedence
+///
+/// Configuration sources are merged in this order (highest to lowest priority):
+/// 1. CLI arguments (e.g., `--css`, `--format`)
+/// 2. Document front matter (YAML at top of markdown file)
+/// 3. Config file (specified via `--config`)
+/// 4. Defaults (PDF format, base16-ocean.dark theme, 10MB limit, 30s timeout)
 #[derive(Debug, Clone)]
 pub struct ConversionConfig {
     /// Merged metadata from the document.
