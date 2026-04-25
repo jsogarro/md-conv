@@ -206,6 +206,14 @@ impl Args {
             }
         }
 
+        // Validate timeout and max_file_size are non-zero
+        if self.timeout == 0 {
+            bail!("Timeout must be at least 1 second");
+        }
+        if self.max_file_size == 0 {
+            bail!("Max file size must be at least 1 MB");
+        }
+
         Ok(())
     }
 

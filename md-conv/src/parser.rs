@@ -76,7 +76,6 @@ pub fn parse_front_matter(
 
 /// Converts Markdown body to HTML with syntax highlighting and TOC.
 #[instrument(skip(content))]
-#[instrument(skip(content))]
 pub fn generate_html(content: &str, theme_name: &str) -> anyhow::Result<(String, String)> {
     let ss = get_syntax_set();
     let theme = get_theme(theme_name);
@@ -148,7 +147,10 @@ fn process_markdown_events<'a>(
                 // generate_html is sync, so we just use it directly. If we were in an async fn,
                 // we would use spawn_blocking).
                 let highlighted = highlighted_html_for_string(&code_content, ss, syntax, theme)
-                    .unwrap_or_else(|_| code_content.clone());
+                    .unwrap_or_else(|e| {
+                        tracing::warn!("Syntax highlighting failed: {}", e);
+                        code_content.clone()
+                    });
 
                 new_events.push(Event::Html(highlighted.into()));
             }

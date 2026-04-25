@@ -135,6 +135,11 @@ fn get_path_from_fd_macos(fd: std::os::unix::io::RawFd) -> Result<PathBuf> {
 
     let mut buf = vec![0u8; PATH_MAX];
 
+    // SAFETY:
+    // - `fd` is a valid file descriptor (owned by std::fs::File)
+    // - `buf` is a valid, zero-initialized buffer of size PATH_MAX
+    // - F_GETPATH is a read-only operation that writes a null-terminated path into buf
+    // - We check the return value for errors before reading from buf
     unsafe {
         let ret = libc::fcntl(fd, F_GETPATH, buf.as_mut_ptr() as *mut c_char);
         if ret == -1 {

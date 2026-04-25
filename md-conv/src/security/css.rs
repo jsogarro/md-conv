@@ -9,7 +9,7 @@ use lightningcss::values::url::Url;
 use lightningcss::visitor::{Visit, VisitTypes, Visitor};
 
 /// Dangerous URL schemes that could lead to script execution
-const DANGEROUS_URL_SCHEMES: &[&str] = &["javascript:", "vbscript:", "data:", "file:"];
+const DANGEROUS_URL_SCHEMES: &[&str] = &["javascript:", "vbscript:", "data:", "file:", "blob:"];
 
 /// A visitor that checks for dangerous CSS constructs.
 struct SecurityVisitor;
@@ -28,6 +28,7 @@ impl<'i> Visitor<'i> for SecurityVisitor {
             || u.starts_with("vbscript:")
             || u.starts_with("data:")
             || u.starts_with("file:")
+            || u.starts_with("blob:")
         {
             return Err(format!("Dangerous URL scheme detected: {}", url.url));
         }

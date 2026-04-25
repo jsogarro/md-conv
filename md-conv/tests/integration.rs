@@ -984,3 +984,125 @@ fn test_nonexistent_file_error() {
         .failure()
         .stderr(predicate::str::contains("not found").or(predicate::str::contains("No such file")));
 }
+
+// ============ P0 Coverage Tests (Phases 3-4) ============
+
+#[test]
+fn test_stdin_to_stdout_pipeline() {
+    let markdown = "# Stdin Test\n\nPipeline content here.";
+    cmd()
+        .arg("--stdin")
+        .arg("--stdout")
+        .arg("-f")
+        .arg("html")
+        .write_stdin(markdown)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Stdin Test"))
+        .stdout(predicate::str::contains("Pipeline content"));
+}
+
+#[test]
+fn test_config_file_loading() {
+    let temp = TempDir::new().unwrap();
+
+    // Create a config YAML
+    let config_path = temp.path().join("md-conv.yaml");
+    let output_dir = temp.path().join("output");
+    fs::write(
+        &config_path,
+        format!(
+            "output_dir: \"{}\"\nformat:\n  - html",
+            output_dir.display()
+        ),
+    )
+    .unwrap();
+
+    // Create a markdown file
+    let input = temp.path().join("test.md");
+    fs::write(&input, "# Config Test\n\nContent.").unwrap();
+
+    cmd()
+        .arg(&input)
+        .arg("-c")
+        .arg(&config_path)
+        .assert()
+        .success();
+
+    // Verify output landed in configured directory
+    assert!(
+        output_dir.join("test.html").exists(),
+        "Output should be in configured output_dir"
+    );
+}
+
+#[test]
+fn test_quiet_mode_suppresses_output() {
+    let temp = TempDir::new().unwrap();
+    let input = temp.path().join("test.md");
+    fs::write(&input, "# Quiet Test").unwrap();
+
+    cmd()
+        .arg(&input)
+        .arg("-f")
+        .arg("html")
+        .arg("--quiet")
+        .assert()
+        .success()
+        .stdout(predicate::str::is_empty());
+}
+
+#[test]
+fn test_json_output_structure() {
+    let temp = TempDir::new().unwrap();
+    let input = temp.path().join("test.md");
+    fs::write(&input, "# JSON Test").unwrap();
+
+    let output = cmd()
+        .arg(&input)
+        .arg("-f")
+        .arg("html")
+        .arg("--json")
+        .output()
+        .expect("Failed to execute");
+
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let json: serde_json::Value =
+        serde_json::from_str(&stdout).expect("--json output should be valid JSON");
+
+    assert!(json.is_array(), "Output should be a JSON array");
+    let results = json.as_array().unwrap();
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0]["status"], "success");
+}
+
+#[test]
+fn test_unicode_file_path() {
+    let temp = TempDir::new().unwrap();
+    let input = temp.path().join("文档test.md");
+    fs::write(&input, "# Unicode Path Test\n\nContent.").unwrap();
+
+    cmd().arg(&input).arg("-f").arg("html").assert().success();
+
+    let output = temp.path().join("文档test.html");
+    assert!(output.exists(), "Should handle unicode file paths");
+}
+
+#[test]
+fn test_chrome_not_found_error_message() {
+    let temp = TempDir::new().unwrap();
+    let input = temp.path().join("test.md");
+    fs::write(&input, "# Test").unwrap();
+
+    cmd()
+        .arg(&input)
+        .arg("-f")
+        .arg("pdf")
+        .arg("--chrome-path")
+        .arg("/nonexistent/chrome")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("not found").or(predicate::str::contains("Chrome")));
+}

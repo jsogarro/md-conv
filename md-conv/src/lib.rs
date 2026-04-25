@@ -101,7 +101,6 @@ pub struct ConversionResult {
 /// 5. Rendering
 /// 6. Output writing (File or Stdout)
 #[instrument(skip(args, content), fields(source = %source))]
-#[instrument(skip(args, content), fields(source = %source))]
 async fn process_input(
     source: InputSource,
     content: Option<String>,
@@ -121,7 +120,7 @@ async fn process_input(
     let full_html = template::render_html(template_ctx)?;
 
     // 4. Render to each requested format
-    let mut output_paths = Vec::new();
+    let mut output_paths = Vec::with_capacity(config.output_formats.len());
 
     for format in &config.output_formats {
         let renderer = renderer::create_renderer(format);
@@ -193,7 +192,12 @@ async fn parse_and_config(
     args: &Args,
 ) -> anyhow::Result<(parser::ParsedDocument, config::ConversionConfig)> {
     // 2. Parse content (Front Matter Phase)
-    let (front_matter, raw_markdown) = if input_path.extension().is_some_and(|ext| ext == "ipynb") {
+    let (front_matter, raw_markdown) = if input_path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .map(|s| s.eq_ignore_ascii_case("ipynb"))
+        .unwrap_or(false)
+    {
         let md = parser::parse_notebook_raw(content)?;
         parser::parse_front_matter(&md)?
     } else {
@@ -280,8 +284,10 @@ async fn render_and_save(
 ///     Ok(())
 /// }
 /// ```
-pub async fn convert_file(input_path: &Path, args: &Args) -> anyhow::Result<Vec<PathBuf>> {
-    let result = process_input(InputSource::File(input_path.to_path_buf()), None, args).await?;
+pub async fn convert_file(input_path: &Path, args: &Args) -> Result<Vec<PathBuf>, ConversionError> {
+    let result = process_input(InputSource::File(input_path.to_path_buf()), None, args)
+        .await
+        .map_err(|e| ConversionError::Generic(e.to_string()))?;
     Ok(result.output)
 }
 
@@ -319,7 +325,8 @@ pub async fn run(args: Args) -> Result<(), ConversionError> {
     };
 
     // Shared collectors
-    let results: Arc<Mutex<Vec<ConversionResult>>> = Arc::new(Mutex::new(Vec::new()));
+    let results: Arc<Mutex<Vec<ConversionResult>>> =
+        Arc::new(Mutex::new(Vec::with_capacity(num_inputs as usize)));
 
     // Stream processing
     stream::iter(inputs)
@@ -344,7 +351,9 @@ pub async fn run(args: Args) -> Result<(), ConversionError> {
                         }
                     }
                 };
-                results.lock().await.push(res);
+                {
+                    results.lock().await.push(res);
+                } // lock released here
 
                 if let Some(bar) = &pb {
                     bar.inc(1);
@@ -479,6 +488,9 @@ async fn run_watch_mode(args: Arc<Args>) -> Result<(), ConversionError> {
             }
         }
     }
+
+    // Shutdown browser pool
+    renderer::browser_pool().shutdown().await;
 
     Ok(())
 }
