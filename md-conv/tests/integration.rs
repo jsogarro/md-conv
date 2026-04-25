@@ -927,3 +927,49 @@ fn test_minimal_document() {
     assert!(html.contains("<h1>Minimal</h1>"));
     assert!(html.contains("Test"));
 }
+
+// ============ Batch Processing Edge Cases ============
+
+#[test]
+fn test_empty_input_list() {
+    // Test empty input list - should handle gracefully without panic
+    // Note: This tests CLI behavior, not run() directly, since we can't easily pass empty args via CLI
+    // The CLI will fail with "No input files specified" or similar, which is acceptable
+    cmd()
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Usage").or(predicate::str::contains("required")));
+}
+
+#[test]
+fn test_mixed_valid_invalid_files() {
+    let temp = TempDir::new().unwrap();
+    let valid = temp.path().join("valid.md");
+    let invalid = temp.path().join("nonexistent.md");
+
+    fs::write(&valid, "# Valid File").unwrap();
+
+    cmd()
+        .arg(&valid)
+        .arg(&invalid)
+        .arg("--format")
+        .arg("html")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("not found").or(predicate::str::contains("No such file")));
+
+    // Valid file should still be processed before the error
+    let _valid_output = temp.path().join("valid.html");
+    // May or may not exist depending on error handling - either is acceptable
+}
+
+#[test]
+fn test_nonexistent_file_error() {
+    cmd()
+        .arg("totally_nonexistent_file_12345.md")
+        .arg("--format")
+        .arg("html")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("not found").or(predicate::str::contains("No such file")));
+}

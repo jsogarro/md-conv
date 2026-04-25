@@ -565,4 +565,35 @@ keywords:
         let doc = parse_markdown(content).unwrap();
         assert!(doc.html_content.contains("plain code"));
     }
+
+    // ============ Additional Parser Edge Case Tests (Phase 9) ============
+
+    #[test]
+    fn test_parse_front_matter_empty_content() {
+        // Parse empty string - should return default FrontMatter and empty body
+        let (front_matter, body) = parse_front_matter("").unwrap();
+        assert!(front_matter.title.is_none());
+        assert!(front_matter.author.is_none());
+        assert!(body.is_empty());
+    }
+
+    #[test]
+    fn test_parse_front_matter_no_front_matter() {
+        // Parse markdown without front matter - should return default FrontMatter and full content as body
+        let content = "# Hello World\n\nThis is a test.";
+        let (front_matter, body) = parse_front_matter(content).unwrap();
+        assert!(front_matter.title.is_none());
+        assert!(front_matter.author.is_none());
+        assert_eq!(body, content);
+    }
+
+    #[test]
+    fn test_parse_front_matter_empty_front_matter_section() {
+        // Parse with empty front matter section - empty YAML, body is "Hello"
+        let content = "---\n---\nHello";
+        let (front_matter, body) = parse_front_matter(content).unwrap();
+        assert!(front_matter.title.is_none());
+        assert!(front_matter.author.is_none());
+        assert_eq!(body.trim(), "Hello");
+    }
 }

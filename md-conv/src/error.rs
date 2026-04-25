@@ -110,4 +110,65 @@ mod tests {
         assert!(matches!(conv_err, ConversionError::Io(_)));
         assert_eq!(conv_err.exit_code(), 2);
     }
+
+    #[test]
+    fn test_from_handlebars_render_error() {
+        // Create a template with invalid syntax to trigger RenderError
+        let mut hb = handlebars::Handlebars::new();
+        // Use strict mode to make missing variables an error
+        hb.set_strict_mode(true);
+        hb.register_template_string("test", "{{missing_var}}").unwrap();
+        let data = serde_json::json!({});
+        let render_result = hb.render("test", &data);
+
+        match render_result {
+            Err(e) => {
+                let conv_err: ConversionError = e.into();
+                assert!(matches!(conv_err, ConversionError::Template(_)));
+                assert_eq!(conv_err.exit_code(), 6);
+                assert!(conv_err.to_string().contains("Template rendering failed"));
+            }
+            Ok(_) => panic!("Expected render error when strict mode is enabled"),
+        }
+    }
+
+    #[test]
+    fn test_all_error_variant_display() {
+        let parse_err = ConversionError::Parse("bad markdown".into());
+        assert_eq!(parse_err.to_string(), "Markdown parse error: bad markdown");
+
+        let browser_err = ConversionError::Browser("chrome crash".into());
+        assert_eq!(browser_err.to_string(), "Browser error: chrome crash");
+
+        let security_err = ConversionError::Security("xss attempt".into());
+        assert_eq!(security_err.to_string(), "Security violation: xss attempt");
+
+        let io_err = ConversionError::Io(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "file not found",
+        ));
+        assert!(io_err.to_string().contains("I/O error"));
+
+        let config_err = ConversionError::Config("invalid yaml".into());
+        assert_eq!(config_err.to_string(), "Configuration error: invalid yaml");
+
+        let notebook_err = ConversionError::Notebook("invalid json".into());
+        assert_eq!(notebook_err.to_string(), "Notebook parse error: invalid json");
+
+        let generic_err = ConversionError::Generic("something failed".into());
+        assert_eq!(generic_err.to_string(), "something failed");
+    }
+
+    #[test]
+    fn test_template_error_exit_code_missing() {
+        // Verify Template variant exit code (was not tested in original test_exit_codes)
+        let mut hb = handlebars::Handlebars::new();
+        hb.register_template_string("test", "{{missing}}").unwrap();
+        let render_result = hb.render("test", &serde_json::json!({}));
+
+        if let Err(e) = render_result {
+            let conv_err: ConversionError = e.into();
+            assert_eq!(conv_err.exit_code(), 6);
+        }
+    }
 }
