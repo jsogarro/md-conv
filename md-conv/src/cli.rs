@@ -121,6 +121,30 @@ pub struct Args {
     pub no_sandbox: bool,
 }
 
+impl Default for Args {
+    fn default() -> Self {
+        Self {
+            input: Vec::new(),
+            stdin: false,
+            format: None,
+            css: None,
+            output: None,
+            stdout: false,
+            output_dir: None,
+            json: false,
+            config: None,
+            watch: false,
+            quiet: false,
+            verbose: 0,
+            chrome_path: None,
+            max_file_size: 10,
+            timeout: 30,
+            allow_external_css: false,
+            no_sandbox: false,
+        }
+    }
+}
+
 impl Args {
     /// Validates CLI arguments before processing.
     ///

@@ -37,6 +37,25 @@ pub struct ParsedDocument {
 }
 
 /// Splits the content into front matter and markdown body.
+///
+/// # Examples
+///
+/// ```rust
+/// use md_conv::parser::parse_front_matter;
+///
+/// let markdown = r#"---
+/// title: "My Document"
+/// author: "Author Name"
+/// ---
+/// # Hello World
+/// This is the body."#;
+///
+/// let (front_matter, body) = parse_front_matter(markdown).unwrap();
+/// assert_eq!(front_matter.title, Some("My Document".to_string()));
+/// assert_eq!(front_matter.author, Some("Author Name".to_string()));
+/// assert!(body.contains("Hello World"));
+/// assert!(body.contains("This is the body"));
+/// ```
 pub fn parse_front_matter(content: &str) -> Result<(FrontMatter, String), crate::error::ConversionError> {
     let matter = Matter::<YAML>::new();
     let parsed = matter.parse(content);

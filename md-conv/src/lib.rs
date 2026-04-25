@@ -11,6 +11,31 @@
 //! - **Jupyter Support**: Seamlessly converts `.ipynb` files via internal markdown extraction.
 //! - **Security Focused**: Implements CSS sanitization, path escape protection, and file size limits.
 //! - **Concurrent Processing**: Automatically processes multiple files in parallel with bounded resource usage.
+//!
+//! ## Quick Start (CLI-style)
+//!
+//! ```rust,no_run
+//! use md_conv::{Args, run, ConversionError};
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<(), ConversionError> {
+//!     let args = Args {
+//!         input: vec!["document.md".into()],
+//!         ..Args::default()
+//!     };
+//!     run(args).await
+//! }
+//! ```
+//!
+//! ## Quick Start (Library)
+//!
+//! ```rust
+//! use md_conv::parser::parse_front_matter;
+//!
+//! let markdown = "# Hello\n\nWorld";
+//! let (front_matter, body) = parse_front_matter(markdown).unwrap();
+//! assert!(body.contains("Hello"));
+//! ```
 
 pub mod cli;
 pub mod config;
@@ -240,6 +265,21 @@ async fn render_and_save(
 
 /// Process a single Markdown or Jupyter Notebook file.
 /// (Maintained for backward compatibility/tests, delegates to process_input)
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// use md_conv::{Args, convert_file};
+/// use std::path::Path;
+///
+/// #[tokio::main]
+/// async fn main() -> anyhow::Result<()> {
+///     let args = Args::default();
+///     let output_paths = convert_file(Path::new("document.md"), &args).await?;
+///     println!("Generated: {:?}", output_paths);
+///     Ok(())
+/// }
+/// ```
 pub async fn convert_file(input_path: &Path, args: &Args) -> anyhow::Result<Vec<PathBuf>> {
     let result = process_input(InputSource::File(input_path.to_path_buf()), None, args).await?;
     Ok(result.output)

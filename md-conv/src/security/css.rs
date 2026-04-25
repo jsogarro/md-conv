@@ -65,6 +65,25 @@ fn check_serialized_css_for_dangerous_urls(css: &str) -> Result<(), crate::error
 /// After parsing and visiting, it also checks the serialized output for any remaining
 /// dangerous patterns as a defense-in-depth measure.
 ///
+/// # Examples
+///
+/// ```rust
+/// use md_conv::security::sanitize_css;
+///
+/// // Safe CSS passes through (minified)
+/// let safe_css = "body { color: red; margin: 10px; }";
+/// let sanitized = sanitize_css(safe_css).unwrap();
+/// assert!(sanitized.contains("color:red") || sanitized.contains("color: red"));
+///
+/// // Dangerous CSS is rejected
+/// let dangerous = "body { background: url('javascript:alert(1)') }";
+/// assert!(sanitize_css(dangerous).is_err());
+///
+/// // @import rules are blocked
+/// let import_css = "@import 'malicious.css';";
+/// assert!(sanitize_css(import_css).is_err());
+/// ```
+///
 /// # Errors
 /// Returns an error if dangerous constructs (javascript: URLs, @import, etc.) are found.
 pub fn sanitize_css(css: &str) -> Result<String, crate::error::ConversionError> {

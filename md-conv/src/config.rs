@@ -117,6 +117,28 @@ impl ConversionConfig {
     /// - Enforcement of the `allow_external_css` security policy.
     /// - Conversion of MB limits to byte counts.
     ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use md_conv::{Args, ConversionConfig};
+    /// use md_conv::config::FrontMatter;
+    /// use std::path::Path;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> anyhow::Result<()> {
+    ///     let args = Args::default();
+    ///     let front_matter = FrontMatter {
+    ///         title: Some("My Document".to_string()),
+    ///         highlight_theme: Some("Solarized (dark)".to_string()),
+    ///         ..Default::default()
+    ///     };
+    ///
+    ///     let config = ConversionConfig::merge(&args, front_matter, Path::new("doc.md")).await?;
+    ///     assert_eq!(config.highlight_theme, "Solarized (dark)");
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
     /// # Errors
     /// Returns an error if CSS files cannot be read or fail sanitization.
     pub async fn merge(
