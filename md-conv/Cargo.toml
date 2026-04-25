@@ -6,8 +6,21 @@ rust-version = "1.75"
 description = "Convert Markdown to PDF and HTML with front matter and custom CSS"
 license = "MIT"
 repository = "https://github.com/ogarro/markdown_converter"
+readme = "README.md"
+documentation = "https://docs.rs/md-conv"
+homepage = "https://github.com/ogarro/markdown_converter"
 keywords = ["markdown", "pdf", "html", "converter", "cli"]
 categories = ["command-line-utilities", "text-processing"]
+exclude = [
+    "after_pooling_benchmark.txt",
+    "after_all_perf_benchmark.txt",
+    "baseline_benchmark.txt",
+    "test.md",
+    "test.pdf",
+    "benches/",
+    "tests/fixtures/",
+    "SECURITY.md",
+]
 
 [dependencies]
 # CLI
@@ -69,6 +82,9 @@ lto = true
 codegen-units = 1
 strip = true
 panic = "abort"
+
+[package.metadata.docs.rs]
+all-features = true
 
 [profile.dev]
 incremental = true
