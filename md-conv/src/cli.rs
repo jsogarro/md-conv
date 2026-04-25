@@ -1,12 +1,20 @@
 use clap::{Parser, ValueEnum};
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+/// Supported output formats for the conversion.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum OutputFormat {
+    /// Portable Document Format (Headless Chrome required)
     Pdf,
+    /// Standard HTML5 document
     Html,
 }
 
+/// Command-line arguments for the `md-conv` tool.
+///
+/// Most options can also be controlled via environmental variables prefixed with `MDCONV_`.
 #[derive(Parser, Debug)]
 #[command(name = "md-conv")]
 #[command(author, version, about = "Convert Markdown to PDF and HTML")]
@@ -15,24 +23,19 @@ pub enum OutputFormat {
     md-conv document.md                    # Convert to PDF (default)
     md-conv document.md -f html            # Convert to HTML
     md-conv document.md -f pdf,html        # Convert to both formats
-    md-conv *.md -O output/                # Batch convert to directory
-    cat doc.md | md-conv --stdin -f html   # Read from stdin
-    md-conv doc.md --stdout                # Write HTML to stdout")]
+    md-conv doc1.md doc2.md                # Batch convert multiple files")]
 pub struct Args {
-    /// Input Markdown file(s). Use --stdin to read from stdin instead.
+    /// Input Markdown file(s)
     #[arg(required_unless_present = "stdin")]
     pub input: Vec<PathBuf>,
 
+    /// Read Markdown content from standard input
+    #[arg(long, conflicts_with = "input")]
+    pub stdin: bool,
+
     /// Output format(s) - can be specified multiple times or comma-separated
-    #[arg(
-        short,
-        long,
-        value_enum,
-        default_value = "pdf",
-        env = "MDCONV_FORMAT",
-        value_delimiter = ','
-    )]
-    pub format: Vec<OutputFormat>,
+    #[arg(short, long, value_enum, env = "MDCONV_FORMAT", value_delimiter = ',')]
+    pub format: Option<Vec<OutputFormat>>,
 
     /// Custom CSS file path
     #[arg(long, value_name = "FILE", env = "MDCONV_CSS")]
@@ -42,53 +45,34 @@ pub struct Args {
     #[arg(short, long, value_name = "FILE")]
     pub output: Option<PathBuf>,
 
-    /// Output directory for batch processing
-    #[arg(short = 'O', long, value_name = "DIR")]
+    /// Write HTML output to standard output (implies --quiet)
+    #[arg(long, conflicts_with = "output", conflicts_with = "output_dir")]
+    pub stdout: bool,
+
+    /// Output directory for all converted files
+    #[arg(short = 'O', long, value_name = "DIR", conflicts_with = "output")]
     pub output_dir: Option<PathBuf>,
 
-    /// Configuration file path (YAML or TOML)
+    /// Output JSON summary of the conversion process
+    #[arg(long)]
+    pub json: bool,
+
+    /// Path to a configuration file (YAML)
     #[arg(short = 'c', long, value_name = "FILE")]
     pub config: Option<PathBuf>,
 
-    // === Safety Flags ===
-    /// Preview actions without executing (dry run)
-    #[arg(long)]
-    pub dry_run: bool,
-
-    /// Overwrite existing files without prompting
-    #[arg(short = 'y', long)]
-    pub force: bool,
-
-    /// Never overwrite existing files (error if file exists)
-    #[arg(short = 'n', long, conflicts_with = "force")]
-    pub no_clobber: bool,
+    /// Watch for changes and re-compile
+    #[arg(short = 'w', long)]
+    pub watch: bool,
 
     // === Output Control ===
     /// Suppress all output except errors
     #[arg(short = 'q', long, conflicts_with = "verbose")]
     pub quiet: bool,
 
-    /// Output results as JSON for scripting
-    #[arg(long)]
-    pub json: bool,
-
     /// Verbose logging (-v info, -vv debug, -vvv trace)
     #[arg(short, long, action = clap::ArgAction::Count)]
     pub verbose: u8,
-
-    // === Pipeline Support ===
-    /// Read Markdown from stdin
-    #[arg(long)]
-    pub stdin: bool,
-
-    /// Write output to stdout (HTML only, not compatible with PDF)
-    #[arg(long)]
-    pub stdout: bool,
-
-    // === Watch Mode ===
-    /// Watch mode - rebuild on file changes
-    #[arg(short, long)]
-    pub watch: bool,
 
     // === Advanced Options ===
     /// Chrome/Chromium executable path (auto-detected if not specified)
@@ -116,10 +100,25 @@ pub struct Args {
     /// Allow CSS from paths outside the input file directory
     #[arg(long)]
     pub allow_external_css: bool,
+
+    /// DANGEROUS: Disable Chrome sandbox (required in some containerized environments)
+    ///
+    /// WARNING: Only use this flag if you trust ALL input content completely.
+    /// The sandbox protects against malicious content exploiting browser vulnerabilities.
+    /// When disabled, XSS or malicious markdown could potentially compromise the host system.
+    #[arg(long)]
+    pub no_sandbox: bool,
 }
 
 impl Args {
-    /// Validate CLI arguments before processing
+    /// Validates CLI arguments before processing.
+    ///
+    /// Checks for:
+    /// - Exclusive usage of `--output` with single input files.
+    /// - Existence of input files, CSS files, and custom Chrome paths.
+    ///
+    /// # Errors
+    /// Returns an error if validation fails.
     pub fn validate(&self) -> anyhow::Result<()> {
         use anyhow::bail;
 
@@ -136,6 +135,23 @@ impl Args {
             if !path.is_file() {
                 bail!("Input path is not a file: {}", path.display());
             }
+        }
+
+        // Validate stdout usage
+        if self.stdout {
+            if let Some(formats) = &self.format {
+                if formats.contains(&OutputFormat::Pdf) {
+                    bail!("PDF output to stdout is currently not supported. Please use -f html.");
+                }
+            }
+            if self.input.len() > 1 {
+                bail!("Cannot write to stdout with multiple input files.");
+            }
+        }
+
+        // Validate watch mode
+        if self.watch && self.stdin {
+            bail!("Cannot use --watch with --stdin.");
         }
 
         // Verify CSS file if provided
@@ -158,7 +174,7 @@ impl Args {
         Ok(())
     }
 
-    /// Get the log level based on verbosity
+    /// Maps the CLI verbosity count (-v, -vv, -vvv) to a standard log level string.
     pub fn log_level(&self) -> &'static str {
         match self.verbose {
             0 => "warn",
@@ -174,15 +190,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_default_format_is_pdf() {
+    fn test_default_format_is_none() {
         let args = Args::parse_from(["md-conv", "test.md"]);
-        assert_eq!(args.format, vec![OutputFormat::Pdf]);
+        assert!(args.format.is_none());
     }
 
     #[test]
     fn test_multiple_formats() {
         let args = Args::parse_from(["md-conv", "test.md", "-f", "pdf", "-f", "html"]);
-        assert_eq!(args.format, vec![OutputFormat::Pdf, OutputFormat::Html]);
+        assert_eq!(
+            args.format,
+            Some(vec![OutputFormat::Pdf, OutputFormat::Html])
+        );
     }
 
     #[test]

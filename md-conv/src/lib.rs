@@ -1,3 +1,17 @@
+//! # md-conv
+//!
+//! A high-performance Markdown to PDF and HTML converter built with Rust.
+//!
+//! This library provides the core logic for parsing Markdown (including Jupyter Notebooks),
+//! managing configurations, and rendering to various output formats using a pooled
+//! Headless Chrome architecture.
+//!
+//! ## Key Features
+//! - **Fast PDF Generation**: Uses a connection pool of Chrome instances to minimize startup overhead.
+//! - **Jupyter Support**: Seamlessly converts `.ipynb` files via internal markdown extraction.
+//! - **Security Focused**: Implements CSS sanitization, path escape protection, and file size limits.
+//! - **Concurrent Processing**: Automatically processes multiple files in parallel with bounded resource usage.
+
 pub mod cli;
 pub mod config;
 pub mod error;
@@ -7,109 +21,292 @@ pub mod security;
 pub mod template;
 
 use anyhow::Context;
-use futures::stream::{self, StreamExt};
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use tokio::sync::Mutex;
-use tracing::{info, instrument};
-
 pub use cli::Args;
 pub use config::ConversionConfig;
 pub use error::ConversionError;
+use futures::stream::{self, StreamExt};
+use indicatif::{ProgressBar, ProgressStyle};
+use notify::{RecursiveMode, Result as NotifyResult, Watcher};
 pub use parser::ParsedDocument;
+use serde::Serialize;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::sync::Mutex;
+use tracing::{info, instrument};
 
-/// Maximum concurrent file conversions
-/// Browser semaphore provides additional backpressure for PDF rendering
+/// Maximum concurrent file conversions.
+///
+/// The browser pool in `renderer/pdf.rs` provides additional backpressure
+/// specifically for Chrome instances.
 const MAX_CONCURRENT_CONVERSIONS: usize = 4;
 
-/// Process a single Markdown file
-#[instrument(skip(args), fields(input = %input_path.display()))]
-pub async fn convert_file(input_path: &Path, args: &Args) -> anyhow::Result<Vec<PathBuf>> {
+/// Source of the input content.
+#[derive(Debug, Clone)]
+pub enum InputSource {
+    File(PathBuf),
+    Stdin,
+}
+
+impl std::fmt::Display for InputSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            InputSource::File(p) => write!(f, "{}", p.display()),
+            InputSource::Stdin => write!(f, "<stdin>"),
+        }
+    }
+}
+
+/// Structured summary of a single conversion result.
+#[derive(Debug, Clone, Serialize)]
+pub struct ConversionResult {
+    pub input: String,
+    pub output: Vec<PathBuf>,
+    pub status: String,
+    pub error: Option<String>,
+}
+
+/// Process a single input source.
+///
+/// This function handles the entire conversion pipeline:
+/// 1. Reading content (File or Stdin)
+/// 2. Security validation
+/// 3. Parsing (Split phase)
+/// 4. Configuration merging
+/// 5. Rendering
+/// 6. Output writing (File or Stdout)
+#[instrument(skip(args, content), fields(source = %source))]
+#[instrument(skip(args, content), fields(source = %source))]
+async fn process_input(
+    source: InputSource,
+    content: Option<String>,
+    args: &Args,
+) -> anyhow::Result<ConversionResult> {
     info!("Starting conversion");
+    let start_time = std::time::Instant::now();
 
-    // 1. Validate file size
-    security::validate_file_size(input_path, args.max_file_size * 1024 * 1024)?;
+    // 1. Determine input path and read content
+    let (input_path, content) = read_input_content(&source, content, args).await?;
 
-    // 2. Read the file
-    let content = std::fs::read_to_string(input_path)
-        .with_context(|| format!("Failed to read: {}", input_path.display()))?;
+    // 2. Parse and merge configuration
+    let (doc, config) = parse_and_config(&input_path, &content, args).await?;
 
-    // 3. Parse content based on file extension
-    let doc = if input_path.extension().map_or(false, |ext| ext == "ipynb") {
-        parser::parse_notebook(&content)?
-    } else {
-        parser::parse_markdown(&content)?
-    };
-
-    // 4. Merge configuration
-    let config = ConversionConfig::merge(args, doc.front_matter.clone(), input_path)?;
-
-    // 5. Generate full HTML
+    // 3. Generate full HTML
     let template_ctx = template::create_context(&doc, &config);
     let full_html = template::render_html(template_ctx)?;
 
-    // 6. Render to each requested format
+    // 4. Render to each requested format
     let mut output_paths = Vec::new();
 
     for format in &config.output_formats {
         let renderer = renderer::create_renderer(format);
-        let span = tracing::info_span!("render", format = renderer.name());
-        let _guard = span.enter();
+        let output_path = render_and_save(
+            renderer.as_ref(),
+            &full_html,
+            &config,
+            args,
+            &input_path,
+            &source,
+        )
+        .await?;
 
-        info!("Rendering to {}", renderer.name());
+        if let Some(path) = output_path {
+            output_paths.push(path);
+        }
+    }
 
-        let output = renderer.render(&full_html, &config).await?;
+    let duration = start_time.elapsed();
+    info!("Conversion completed in {:?}", duration);
 
+    Ok(ConversionResult {
+        input: source.to_string(),
+        output: output_paths,
+        status: "success".to_string(),
+        error: None,
+    })
+}
+
+async fn read_input_content(
+    source: &InputSource,
+    content: Option<String>,
+    args: &Args,
+) -> anyhow::Result<(PathBuf, String)> {
+    match source {
+        InputSource::File(path) => {
+            if let Some(c) = content {
+                Ok((path.clone(), c))
+            } else {
+                let mut file =
+                    security::validate_file_size(path, args.max_file_size * 1024 * 1024).await?;
+                let mut c = String::new();
+                file.read_to_string(&mut c)
+                    .await
+                    .with_context(|| format!("Failed to read: {}", path.display()))?;
+                Ok((path.clone(), c))
+            }
+        }
+        InputSource::Stdin => {
+            if let Some(c) = content {
+                Ok((PathBuf::from("stdin.md"), c))
+            } else {
+                let mut c = String::new();
+                let max_bytes = args.max_file_size * 1024 * 1024;
+                let mut stdin = tokio::io::stdin().take(max_bytes);
+                stdin
+                    .read_to_string(&mut c)
+                    .await
+                    .context("Failed to read stdin")?;
+                Ok((PathBuf::from("stdin.md"), c))
+            }
+        }
+    }
+}
+
+async fn parse_and_config(
+    input_path: &Path,
+    content: &str,
+    args: &Args,
+) -> anyhow::Result<(parser::ParsedDocument, config::ConversionConfig)> {
+    // 2. Parse content (Front Matter Phase)
+    let (front_matter, raw_markdown) = if input_path.extension().is_some_and(|ext| ext == "ipynb") {
+        let md = parser::parse_notebook_raw(content)?;
+        parser::parse_front_matter(&md)?
+    } else {
+        parser::parse_front_matter(content)?
+    };
+
+    // 3. Merge configuration
+    let config = ConversionConfig::merge(args, front_matter.clone(), input_path).await?;
+
+    // 4. Generate HTML (Body Phase) with highlighting
+    let (html_content, toc_html) = parser::generate_html(&raw_markdown, &config.highlight_theme)?;
+
+    let doc = parser::ParsedDocument {
+        front_matter,
+        html_content,
+        toc_html: Some(toc_html),
+    };
+
+    Ok((doc, config))
+}
+
+async fn render_and_save(
+    renderer: &dyn renderer::Renderer,
+    full_html: &str,
+    config: &config::ConversionConfig,
+    args: &Args,
+    input_path: &Path,
+    source: &InputSource,
+) -> anyhow::Result<Option<PathBuf>> {
+    let span = tracing::info_span!("render", format = renderer.name());
+    let _guard = span.enter();
+
+    info!("Rendering to {}", renderer.name());
+
+    let output = renderer.render(full_html, config).await?;
+
+    // Determine output destination
+    if args.stdout && matches!(output.extension, "html") {
+        let mut stdout = tokio::io::stdout();
+        stdout.write_all(&output.bytes).await?;
+        stdout.flush().await?;
+        Ok(None)
+    } else {
         // Determine output path
         let output_path = if let Some(explicit) = &args.output {
             explicit.clone()
+        } else if let Some(dir) = &config.output_dir {
+            let filename = input_path
+                .file_name()
+                .unwrap_or_else(|| std::ffi::OsStr::new("output"));
+            let mut p = dir.join(filename);
+            p.set_extension(output.extension);
+            p
         } else {
-            input_path.with_extension(output.extension)
+            let mut p = input_path.to_path_buf();
+            if matches!(source, InputSource::Stdin) {
+                p = PathBuf::from("output"); // Default name for stdin
+            }
+            p.set_extension(output.extension);
+            p
         };
 
         // Write output
         renderer::write_output(&output, &output_path).await?;
-
         info!(path = %output_path.display(), "Created output");
-        output_paths.push(output_path);
+        Ok(Some(output_path))
     }
-
-    Ok(output_paths)
 }
 
-/// Main entry point with parallel file processing
-///
-/// Uses bounded concurrency to prevent resource exhaustion when
-/// processing many files. The browser semaphore in pdf.rs provides
-/// additional backpressure specifically for Chrome instances.
+/// Process a single Markdown or Jupyter Notebook file.
+/// (Maintained for backward compatibility/tests, delegates to process_input)
+pub async fn convert_file(input_path: &Path, args: &Args) -> anyhow::Result<Vec<PathBuf>> {
+    let result = process_input(InputSource::File(input_path.to_path_buf()), None, args).await?;
+    Ok(result.output)
+}
+
+/// Main entry point for the conversion tool.
 #[instrument(skip(args), name = "md_conv")]
 pub async fn run(args: Args) -> anyhow::Result<()> {
     let args = Arc::new(args);
 
-    // Shared collectors for results and errors (protected by mutex)
-    let all_outputs: Arc<Mutex<Vec<PathBuf>>> = Arc::new(Mutex::new(Vec::new()));
-    let errors: Arc<Mutex<Vec<(PathBuf, anyhow::Error)>>> = Arc::new(Mutex::new(Vec::new()));
+    // Watch mode hook
+    if args.watch {
+        return run_watch_mode(args).await;
+    }
 
-    // Process files concurrently with bounded parallelism
-    let input_paths: Vec<PathBuf> = args.input.clone();
+    // Prepare inputs
+    let inputs: Vec<InputSource> = if args.stdin {
+        vec![InputSource::Stdin]
+    } else {
+        args.input
+            .iter()
+            .map(|p| InputSource::File(p.clone()))
+            .collect()
+    };
 
-    stream::iter(input_paths)
-        .map(|input_path| {
+    let num_inputs = inputs.len() as u64;
+    let pb = if !args.quiet && !args.json && num_inputs > 0 {
+        let pb = ProgressBar::new(num_inputs);
+        pb.set_style(ProgressStyle::with_template(
+            "{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta}) {msg}",
+        )?
+        .progress_chars("#>-"));
+        Some(pb)
+    } else {
+        None
+    };
+
+    // Shared collectors
+    let results: Arc<Mutex<Vec<ConversionResult>>> = Arc::new(Mutex::new(Vec::new()));
+
+    // Stream processing
+    stream::iter(inputs)
+        .map(|source| {
             let args = Arc::clone(&args);
-            let all_outputs = Arc::clone(&all_outputs);
-            let errors = Arc::clone(&errors);
-
+            let results = Arc::clone(&results);
+            let pb = pb.clone();
             async move {
-                match convert_file(&input_path, &args).await {
-                    Ok(outputs) => {
-                        let mut guard = all_outputs.lock().await;
-                        guard.extend(outputs);
-                    }
+                if let Some(bar) = &pb {
+                    bar.set_message(format!("Processing {}", source));
+                }
+
+                let res = match process_input(source.clone(), None, &args).await {
+                    Ok(r) => r,
                     Err(e) => {
-                        tracing::error!(path = %input_path.display(), error = %e, "Conversion failed");
-                        let mut guard = errors.lock().await;
-                        guard.push((input_path, e));
+                        tracing::error!(source = %source, error = %e, "Conversion failed");
+                        ConversionResult {
+                            input: source.to_string(),
+                            output: vec![],
+                            status: "error".to_string(),
+                            error: Some(e.to_string()),
+                        }
                     }
+                };
+                results.lock().await.push(res);
+
+                if let Some(bar) = &pb {
+                    bar.inc(1);
                 }
             }
         })
@@ -117,28 +314,117 @@ pub async fn run(args: Args) -> anyhow::Result<()> {
         .collect::<Vec<()>>()
         .await;
 
-    // Extract results from mutex (no longer need locks after stream completes)
-    let all_outputs = Arc::try_unwrap(all_outputs)
-        .expect("all references dropped")
-        .into_inner();
-    let errors = Arc::try_unwrap(errors)
-        .expect("all references dropped")
-        .into_inner();
+    if let Some(bar) = &pb {
+        bar.finish_with_message("Done!");
+    }
 
     // Report results
-    if !all_outputs.is_empty() {
-        println!("\nConverted {} file(s):", all_outputs.len());
-        for path in &all_outputs {
-            println!("  -> {}", path.display());
+    let results = results.lock().await;
+
+    if args.json {
+        let json_output = serde_json::to_string_pretty(&*results)?;
+        println!("{}", json_output);
+    } else if !args.quiet {
+        // Standard textual summary
+        let success_count = results.iter().filter(|r| r.status == "success").count();
+        let error_count = results.iter().filter(|r| r.status == "error").count();
+
+        if success_count > 0 {
+            println!("\nConverted {} file(s):", success_count);
+            for res in results.iter().filter(|r| r.status == "success") {
+                for path in &res.output {
+                    println!("  -> {}", path.display());
+                }
+            }
+        }
+        if error_count > 0 {
+            eprintln!("\nFailed {} file(s):", error_count);
+            for res in results.iter().filter(|r| r.status == "error") {
+                eprintln!(
+                    "  X  {}: {}",
+                    res.input,
+                    res.error.as_deref().unwrap_or("Unknown error")
+                );
+            }
+            // If explicit files requested failed, we error out
+            if success_count == 0 {
+                anyhow::bail!("{} file(s) failed to convert", error_count);
+            }
+        }
+    } else {
+        // Quiet mode - only check for errors to return exit code
+        let error_count = results.iter().filter(|r| r.status == "error").count();
+        if error_count > 0 {
+            anyhow::bail!("{} file(s) failed to convert", error_count);
         }
     }
 
-    if !errors.is_empty() {
-        eprintln!("\nFailed {} file(s):", errors.len());
-        for (path, error) in &errors {
-            eprintln!("  X  {}: {}", path.display(), error);
+    // Shutdown browser pool
+    renderer::browser_pool().shutdown().await;
+
+    Ok(())
+}
+
+/// Watch mode loop
+async fn run_watch_mode(args: Arc<Args>) -> anyhow::Result<()> {
+    info!("Starting watch mode...");
+    let (tx, mut rx) = tokio::sync::mpsc::channel(100);
+
+    // Setup watcher
+    let mut watcher = notify::recommended_watcher(move |res: NotifyResult<notify::Event>| {
+        match res {
+            Ok(event) => {
+                // Filter for Modify/Create events
+                if matches!(
+                    event.kind,
+                    notify::EventKind::Modify(_) | notify::EventKind::Create(_)
+                ) {
+                    let _ = tx.blocking_send(event);
+                }
+            }
+            Err(e) => tracing::error!("Watch error: {:?}", e),
         }
-        anyhow::bail!("{} file(s) failed to convert", errors.len());
+    })?;
+
+    // Watch inputs
+    for input in &args.input {
+        if input.exists() {
+            watcher.watch(input, RecursiveMode::NonRecursive)?;
+        }
+    }
+    // Watch CSS if provided
+    if let Some(css) = &args.css {
+        if css.exists() {
+            watcher.watch(css, RecursiveMode::NonRecursive)?;
+        }
+    }
+
+    println!("Watching for changes... (Press Ctrl+C to stop)");
+
+    // Debounce/Event loop
+    // Simple implementation: convert whatever file changed.
+    while let Some(event) = rx.recv().await {
+        for path in event.paths {
+            // Check if it's one of our inputs
+            if args.input.contains(&path) {
+                info!("File changed: {}", path.display());
+                match process_input(InputSource::File(path.clone()), None, &args).await {
+                    Ok(res) => {
+                        println!("Re-converted: {}", path.display());
+                        if let Some(err) = res.error {
+                            eprintln!("  Error: {}", err);
+                        }
+                    }
+                    Err(e) => eprintln!("Failed to re-convert {}: {}", path.display(), e),
+                }
+            } else if Some(&path) == args.css.as_ref() {
+                // If CSS changed, re-convert ALL inputs
+                info!("CSS changed, re-converting all files");
+                for input in &args.input {
+                    let _ = process_input(InputSource::File(input.clone()), None, &args).await;
+                }
+            }
+        }
     }
 
     Ok(())

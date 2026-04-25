@@ -1,22 +1,41 @@
 <!DOCTYPE html>
 <html lang="{{#if lang}}{{lang}}{{else}}en{{/if}}">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Content Security Policy: Defense-in-depth against XSS -->
+    <!--
+        default-src 'self': Only allow resources from same origin
+        style-src 'self' 'unsafe-inline': Allow inline styles (needed for custom CSS)
+        img-src 'self' data: https:; Allow images from self, data URIs, and HTTPS
+        script-src 'none': Block all JavaScript execution
+        object-src 'none': Block plugins (Flash, etc.)
+        frame-ancestors 'none': Prevent embedding in iframes
+    -->
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; script-src 'none'; object-src 'none'; frame-ancestors 'none';">
     {{#if title}}<title>{{title}}</title>{{/if}}
-    {{#if author}}<meta name="author" content="{{author}}">{{/if}}
-    {{#if description}}<meta name="description" content="{{description}}">{{/if}}
-    {{#if keywords}}<meta name="keywords" content="{{keywords}}">{{/if}}
+    {{#if author}}
+    <meta name="author" content="{{author}}">{{/if}}
+    {{#if description}}
+    <meta name="description" content="{{description}}">{{/if}}
+    {{#if keywords}}
+    <meta name="keywords" content="{{keywords}}">{{/if}}
     <meta name="generator" content="md-conv">
     <style>
         /* Reset & Base Styles */
-        *, *::before, *::after { box-sizing: border-box; }
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+        }
 
         html {
             font-size: 16px;
             line-height: 1.6;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-                         "Helvetica Neue", Arial, sans-serif;
+                "Helvetica Neue", Arial, sans-serif;
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
         }
@@ -31,22 +50,48 @@
         }
 
         /* Typography */
-        h1, h2, h3, h4, h5, h6 {
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6 {
             margin-top: 1.5em;
             margin-bottom: 0.5em;
             line-height: 1.25;
             font-weight: 600;
         }
 
-        h1 { font-size: 2.25rem; border-bottom: 1px solid #e5e5e5; padding-bottom: 0.3em; }
-        h2 { font-size: 1.75rem; }
-        h3 { font-size: 1.375rem; }
-        h4 { font-size: 1.125rem; }
+        h1 {
+            font-size: 2.25rem;
+            border-bottom: 1px solid #e5e5e5;
+            padding-bottom: 0.3em;
+        }
 
-        p { margin: 1em 0; }
+        h2 {
+            font-size: 1.75rem;
+        }
 
-        a { color: #0066cc; text-decoration: none; }
-        a:hover { text-decoration: underline; }
+        h3 {
+            font-size: 1.375rem;
+        }
+
+        h4 {
+            font-size: 1.125rem;
+        }
+
+        p {
+            margin: 1em 0;
+        }
+
+        a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
 
         /* Code */
         code {
@@ -78,29 +123,44 @@
             margin: 1.5em 0;
         }
 
-        th, td {
+        th,
+        td {
             border: 1px solid #ddd;
             padding: 0.75rem;
             text-align: left;
         }
 
-        th { background: #f9f9f9; font-weight: 600; }
-        tr:nth-child(even) { background: #fafafa; }
+        th {
+            background: #f9f9f9;
+            font-weight: 600;
+        }
+
+        tr:nth-child(even) {
+            background: #fafafa;
+        }
 
         /* Lists */
-        ul, ol { padding-left: 2em; }
-        li { margin: 0.25em 0; }
+        ul,
+        ol {
+            padding-left: 2em;
+        }
+
+        li {
+            margin: 0.25em 0;
+        }
 
         /* Task Lists */
         ul.contains-task-list {
             list-style: none;
             padding-left: 0;
         }
+
         li.task-list-item {
             display: flex;
             align-items: baseline;
             gap: 0.5em;
         }
+
         input[type="checkbox"] {
             margin-right: 0.5em;
         }
@@ -114,8 +174,13 @@
             background: #fafafa;
         }
 
-        blockquote p:first-child { margin-top: 0; }
-        blockquote p:last-child { margin-bottom: 0; }
+        blockquote p:first-child {
+            margin-top: 0;
+        }
+
+        blockquote p:last-child {
+            margin-bottom: 0;
+        }
 
         /* Horizontal Rules */
         hr {
@@ -155,22 +220,80 @@
             font-size: 0.9rem;
         }
 
-        .document-meta span + span::before {
+        .document-meta span+span::before {
             content: " | ";
         }
 
         /* Print Styles */
         @media print {
+
+            html,
             body {
+                font-size: 12pt;
+                width: auto;
+                height: auto;
+                border: 0;
+                margin: 0;
                 padding: 0;
-                max-width: none;
+                float: none;
                 color: #000;
+                background: white;
             }
-            a { color: inherit; }
-            pre, code { background: #f5f5f5; }
+
+            /* Headers relative to 12pt base */
+            h1 {
+                font-size: 24pt;
+                border-bottom: 2pt solid #e5e5e5;
+            }
+
+            h2 {
+                font-size: 18pt;
+            }
+
+            h3 {
+                font-size: 14pt;
+            }
+
+            h4 {
+                font-size: 12pt;
+            }
+
+            p,
+            li,
+            td {
+                font-size: 12pt;
+                orphans: 3;
+                widows: 3;
+            }
+
+            a {
+                color: inherit;
+                text-decoration: none;
+            }
+
+            /* Show hrefs in print */
+            a[href^="http"]:after {
+                content: " (" attr(href) ")";
+                font-size: 10pt;
+                color: #666;
+            }
+
+            pre,
+            code {
+                background: #f5f5f5;
+                border: 1pt solid #ddd;
+                page-break-inside: avoid;
+            }
+
+            pre {
+                white-space: pre-wrap;
+                word-wrap: break-word;
+            }
 
             /* Avoid page breaks inside these elements */
-            pre, blockquote, table, figure {
+            blockquote,
+            table,
+            figure {
                 page-break-inside: avoid;
             }
 
@@ -182,10 +305,11 @@
     </style>
     {{#if custom_css}}
     <style>
-{{{custom_css}}}
+        {{{custom_css}}}
     </style>
     {{/if}}
 </head>
+
 <body>
     {{#if title}}
     <header class="document-header">
@@ -197,8 +321,17 @@
     </header>
     {{/if}}
 
+    {{#if toc}}
+    <div id="toc">
+        <h2 class="toc-title">Table of Contents</h2>
+        {{{toc}}}
+        <hr>
+    </div>
+    {{/if}}
+
     <main class="content">
-{{{content}}}
+        {{{content}}}
     </main>
 </body>
+
 </html>

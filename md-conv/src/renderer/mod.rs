@@ -1,37 +1,52 @@
+//! # Output Renderers
+//!
+//! This module defines the common interface and infrastructure for generating various
+//! output formats from the intermediate HTML representation.
+//!
+//! Current implementations include:
+//! - **HTML**: Simple pass-through or template-wrapped output.
+//! - **PDF**: Headless Chrome-based rendering with full CSS/JavaScript support.
+
 pub mod html;
 pub mod pdf;
 
+pub use pdf::browser_pool;
+
 use std::path::Path;
 
-/// Output from a render operation
+/// The result of a successful rendering operation.
 #[derive(Debug)]
 pub struct RenderOutput {
+    /// Raw binary content of the generated file.
     pub bytes: Vec<u8>,
+    /// Standard file extension for this format (e.g., "pdf").
     pub extension: &'static str,
 }
 
-/// Common trait for all output renderers
+/// A common interface for all document output formats.
 ///
-/// Note: We use async-trait because native Rust async traits (1.75+)
-/// don't support trait objects (dyn Trait). Since we need dynamic
-/// dispatch via Box<dyn Renderer>, async-trait is required.
+/// Implementations must be `Send` and `Sync` to support concurrent processing.
+///
+/// Note: We use the `async_trait` crate because native Rust async traits (1.75+)
+/// do not yet support dynamic dispatch (`dyn Renderer`), which is required for
+/// our multi-format processing loop.
 #[async_trait::async_trait]
 pub trait Renderer: Send + Sync {
-    /// Render the HTML content to the target format
+    /// Converts intermediate HTML into the final output format.
     async fn render(
         &self,
         html: &str,
         config: &crate::config::ConversionConfig,
     ) -> anyhow::Result<RenderOutput>;
 
-    /// File extension for this format (without dot)
+    /// Returns the file extension (without the dot) associated with this format.
     fn extension(&self) -> &'static str;
 
-    /// Human-readable name for logging
+    /// Returns a human-readable name used for logging and diagnostics.
     fn name(&self) -> &'static str;
 }
 
-/// Create a renderer based on output format
+/// Factory function to instantiate the appropriate renderer for a given format.
 pub fn create_renderer(format: &crate::cli::OutputFormat) -> Box<dyn Renderer> {
     match format {
         crate::cli::OutputFormat::Html => Box::new(html::HtmlRenderer),
@@ -39,7 +54,14 @@ pub fn create_renderer(format: &crate::cli::OutputFormat) -> Box<dyn Renderer> {
     }
 }
 
-/// Write render output to file
+/// Persists the rendered content to the filesystem.
+///
+/// This function handles:
+/// 1. Verifying and creating parent directories if they don't exist.
+/// 2. Asynchronous file writing via `tokio::fs`.
+///
+/// # Errors
+/// Returns an error if directory creation or file writing fails.
 pub async fn write_output(output: &RenderOutput, path: &Path) -> anyhow::Result<()> {
     use anyhow::Context;
     use tokio::fs;
